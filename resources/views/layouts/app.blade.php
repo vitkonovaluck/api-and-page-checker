@@ -8,7 +8,7 @@
 </head>
 <body class="min-h-screen bg-slate-100 text-slate-900 antialiased">
     <header class="border-b border-slate-200 bg-white">
-        <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
+        <div class="mx-auto flex w-full max-w-none items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
             <a href="{{ route('sites.index') }}" class="text-lg font-semibold tracking-tight text-slate-900">
                 API Snapshot Checker
             </a>
@@ -29,7 +29,7 @@
         </div>
     </header>
 
-    <main class="mx-auto max-w-6xl px-4 py-8">
+    <main class="mx-auto w-full max-w-none px-4 py-8 sm:px-6 lg:px-8">
         @if (session('success'))
             <div class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                 {{ session('success') }}
