@@ -181,6 +181,65 @@
         </form>
     </dialog>
 
+    @include('partials.response-time-chart', [
+        'chart' => $responseTimeChart,
+        'chartId' => 'site-response-time-chart',
+        'title' => 'Історія часу відповіді адрес',
+        'subtitle' => 'Середнє за періоди: останній час, 6 / 12 / 24 / 48 / 96 год, 1 тиждень',
+    ])
+
+    @if (($scheduleStats && $scheduleStats['checks_count'] > 0) || ($siteStats['checks_count'] ?? 0) > 0)
+        <section class="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 class="mb-1 text-base font-semibold text-slate-900">Середні показники перевірок</h2>
+            <p class="mb-4 text-sm text-slate-500">
+                Середньоарифметичні значення за історією знімків
+                @if ($site->schedule_enabled)
+                    (для розкладу — окремо по запусках)
+                @endif
+            </p>
+            <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                @if ($site->schedule_enabled && $scheduleStats && $scheduleStats['checks_count'] > 0)
+                    <div class="rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-3">
+                        <dt class="text-xs uppercase tracking-wide text-emerald-800/70">Сер. час (розклад)</dt>
+                        <dd class="mt-1 text-lg font-semibold text-emerald-900">
+                            {{ $scheduleStats['avg_response_time_ms'] !== null ? $scheduleStats['avg_response_time_ms'].' ms' : '—' }}
+                        </dd>
+                        <p class="mt-1 text-xs text-emerald-800/70">
+                            {{ $scheduleStats['checks_count'] }} перевірок у розкладі
+                        </p>
+                    </div>
+                    <div class="rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-3">
+                        <dt class="text-xs uppercase tracking-wide text-emerald-800/70">Сер. помилок / запуск</dt>
+                        <dd class="mt-1 text-lg font-semibold text-emerald-900">
+                            {{ $scheduleStats['avg_errors_per_run'] !== null ? $scheduleStats['avg_errors_per_run'] : '—' }}
+                        </dd>
+                        <p class="mt-1 text-xs text-emerald-800/70">
+                            {{ $scheduleStats['error_count'] }} помилок за {{ $scheduleStats['runs_count'] }} запусків
+                        </p>
+                    </div>
+                @endif
+                <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                    <dt class="text-xs uppercase tracking-wide text-slate-500">Сер. час (усі)</dt>
+                    <dd class="mt-1 text-lg font-semibold text-slate-900">
+                        {{ $siteStats['avg_response_time_ms'] !== null ? $siteStats['avg_response_time_ms'].' ms' : '—' }}
+                    </dd>
+                    <p class="mt-1 text-xs text-slate-500">
+                        {{ $siteStats['checks_count'] }} перевірок загалом
+                    </p>
+                </div>
+                <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                    <dt class="text-xs uppercase tracking-wide text-slate-500">Сер. помилок / перевірка</dt>
+                    <dd class="mt-1 text-lg font-semibold text-slate-900">
+                        {{ $siteStats['avg_errors'] !== null ? $siteStats['avg_errors'] : '—' }}
+                    </dd>
+                    <p class="mt-1 text-xs text-slate-500">
+                        {{ $siteStats['error_count'] }} помилок загалом
+                    </p>
+                </div>
+            </dl>
+        </section>
+    @endif
+
     <section class="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 class="mb-4 text-base font-semibold text-slate-900">Додати адресу</h2>
         <form method="POST" action="{{ route('addresses.store', $site) }}" class="grid gap-4 sm:grid-cols-2">
@@ -246,6 +305,8 @@
                             <th class="px-5 py-3">Остання перевірка</th>
                             <th class="px-5 py-3">Статус</th>
                             <th class="px-5 py-3">Час відповіді</th>
+                            <th class="px-5 py-3">Сер. час</th>
+                            <th class="px-5 py-3">Сер. помилок</th>
                             <th class="px-5 py-3 text-right">Дії</th>
                         </tr>
                     </thead>
@@ -254,6 +315,7 @@
                             @php
                                 $address->setRelation('site', $site);
                                 $latest = $address->latestSnapshot;
+                                $stats = $addressStats[$address->id] ?? ['checks_count' => 0, 'avg_response_time_ms' => null, 'error_count' => 0, 'avg_errors' => null];
                             @endphp
                             <tr class="align-top hover:bg-slate-50/80">
                                 <td class="px-5 py-4">
@@ -282,6 +344,17 @@
                                 </td>
                                 <td class="px-5 py-4 text-slate-700">
                                     {{ $latest ? $latest->response_time_ms.' ms' : '—' }}
+                                </td>
+                                <td class="px-5 py-4 text-slate-700">
+                                    {{ $stats['avg_response_time_ms'] !== null ? $stats['avg_response_time_ms'].' ms' : '—' }}
+                                </td>
+                                <td class="px-5 py-4 text-slate-700">
+                                    @if ($stats['checks_count'] > 0)
+                                        <span title="Середня кількість помилок на перевірку">{{ $stats['avg_errors'] }}</span>
+                                        <span class="block text-xs text-slate-400">{{ $stats['error_count'] }} / {{ $stats['checks_count'] }}</span>
+                                    @else
+                                        —
+                                    @endif
                                 </td>
                                 <td class="px-5 py-4">
                                     <div class="flex flex-wrap justify-end gap-1.5">

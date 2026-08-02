@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Address;
 use App\Models\Site;
 use App\Models\Snapshot;
+use App\Services\CheckStats;
 use App\Services\DiffService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -43,7 +44,7 @@ class AddressController extends Controller
             ->with('success', 'Адресу додано.');
     }
 
-    public function show(Site $site, Address $address, DiffService $diffService): View
+    public function show(Site $site, Address $address, DiffService $diffService, CheckStats $checkStats): View
     {
         abort_unless($address->site_id === $site->id, 404);
 
@@ -53,6 +54,8 @@ class AddressController extends Controller
         $latest = $address->snapshots->first();
         $previous = $latest?->previous();
         $diff = $latest ? $diffService->compare($previous, $latest) : null;
+        $stats = $checkStats->forSnapshots($address->snapshots);
+        $responseTimeChart = $checkStats->responseTimeChartForAddress($address);
 
         return view('addresses.show', [
             'site' => $site,
@@ -60,6 +63,8 @@ class AddressController extends Controller
             'snapshots' => $address->snapshots,
             'latest' => $latest,
             'diff' => $diff,
+            'stats' => $stats,
+            'responseTimeChart' => $responseTimeChart,
         ]);
     }
 
