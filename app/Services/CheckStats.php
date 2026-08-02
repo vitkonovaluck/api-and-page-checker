@@ -11,6 +11,22 @@ use Illuminate\Support\Facades\DB;
 class CheckStats
 {
     /**
+     * Rolling windows for response-time history charts.
+     * `hours: null` means the latest snapshot value (not a window average).
+     *
+     * @var array<string, array{label: string, hours: int|null}>
+     */
+    public const RESPONSE_TIME_PERIODS = [
+        'latest' => ['label' => 'Останній', 'hours' => null],
+        '6h' => ['label' => '6 год', 'hours' => 6],
+        '12h' => ['label' => '12 год', 'hours' => 12],
+        '24h' => ['label' => '24 год', 'hours' => 24],
+        '48h' => ['label' => '48 год', 'hours' => 48],
+        '96h' => ['label' => '96 год', 'hours' => 96],
+        '1w' => ['label' => '1 тиждень', 'hours' => 168],
+    ];
+
+    /**
      * @return array{
      *     checks_count: int,
      *     avg_response_time_ms: int|null,
@@ -150,6 +166,164 @@ class CheckStats
         }
 
         return $stats;
+    }
+
+    /**
+     * Average response times for fixed lookback periods (plus latest).
+     *
+     * @param  Collection<int, int>|array<int, int>  $addressIds
+     * @return array{
+     *     labels: list<string>,
+     *     keys: list<string>,
+     *     values: list<int|null>,
+     *     counts: list<int>
+     * }
+     */
+    public function responseTimePeriods(Collection|array $addressIds): array
+    {
+        $addressIds = collect($addressIds)->map(fn ($id) => (int) $id)->filter()->values();
+        $labels = [];
+        $keys = [];
+        $values = [];
+        $counts = [];
+
+        if ($addressIds->isEmpty()) {
+            foreach (self::RESPONSE_TIME_PERIODS as $key => $period) {
+                $keys[] = $key;
+                $labels[] = $period['label'];
+                $values[] = null;
+                $counts[] = 0;
+            }
+
+            return compact('labels', 'keys', 'values', 'counts');
+        }
+
+        $maxHours = collect(self::RESPONSE_TIME_PERIODS)
+            ->pluck('hours')
+            ->filter()
+            ->max() ?? 168;
+
+        $snapshots = Snapshot::query()
+            ->whereIn('address_id', $addressIds)
+            ->where('created_at', '>=', now()->subHours($maxHours))
+            ->orderByDesc('created_at')
+            ->get(['address_id', 'response_time_ms', 'created_at']);
+
+        $latestIds = Snapshot::query()
+            ->selectRaw('MAX(id) as id')
+            ->whereIn('address_id', $addressIds)
+            ->groupBy('address_id');
+
+        $latestByAddress = Snapshot::query()
+            ->whereIn('id', $latestIds)
+            ->get(['id', 'address_id', 'response_time_ms']);
+
+        foreach (self::RESPONSE_TIME_PERIODS as $key => $period) {
+            $keys[] = $key;
+            $labels[] = $period['label'];
+
+            if ($period['hours'] === null) {
+                $latestValues = $latestByAddress->pluck('response_time_ms');
+                $counts[] = $latestValues->count();
+                $values[] = $latestValues->isEmpty()
+                    ? null
+                    : (int) round((float) $latestValues->avg());
+
+                continue;
+            }
+
+            $from = now()->subHours($period['hours']);
+            $window = $snapshots->filter(
+                fn (Snapshot $snapshot) => $snapshot->created_at !== null
+                    && $snapshot->created_at->gte($from)
+            );
+            $counts[] = $window->count();
+            $values[] = $window->isEmpty()
+                ? null
+                : (int) round((float) $window->avg('response_time_ms'));
+        }
+
+        return compact('labels', 'keys', 'values', 'counts');
+    }
+
+    /**
+     * Multi-series chart data for a site (one series per address + overall).
+     *
+     * @return array{
+     *     labels: list<string>,
+     *     keys: list<string>,
+     *     series: list<array{id: int|string, label: string, values: list<int|null>, counts: list<int>}>,
+     *     has_data: bool
+     * }
+     */
+    public function responseTimeChartForSite(Site $site): array
+    {
+        $site->loadMissing('addresses');
+
+        $labels = array_column(array_values(self::RESPONSE_TIME_PERIODS), 'label');
+        $keys = array_keys(self::RESPONSE_TIME_PERIODS);
+        $series = [];
+        $hasData = false;
+
+        foreach ($site->addresses as $address) {
+            $periods = $this->responseTimePeriods([$address->id]);
+            if (collect($periods['values'])->filter(fn ($v) => $v !== null)->isNotEmpty()) {
+                $hasData = true;
+            }
+
+            $series[] = [
+                'id' => $address->id,
+                'label' => $address->name ?: $address->endpoint,
+                'values' => $periods['values'],
+                'counts' => $periods['counts'],
+            ];
+        }
+
+        if ($site->addresses->count() > 1) {
+            $overall = $this->responseTimePeriods($site->addresses->pluck('id'));
+            if (collect($overall['values'])->filter(fn ($v) => $v !== null)->isNotEmpty()) {
+                $hasData = true;
+            }
+            array_unshift($series, [
+                'id' => 'overall',
+                'label' => 'Усі адреси (сер.)',
+                'values' => $overall['values'],
+                'counts' => $overall['counts'],
+            ]);
+        }
+
+        return [
+            'labels' => $labels,
+            'keys' => $keys,
+            'series' => $series,
+            'has_data' => $hasData,
+        ];
+    }
+
+    /**
+     * @return array{
+     *     labels: list<string>,
+     *     keys: list<string>,
+     *     series: list<array{id: int|string, label: string, values: list<int|null>, counts: list<int>}>,
+     *     has_data: bool
+     * }
+     */
+    public function responseTimeChartForAddress(Address $address): array
+    {
+        $periods = $this->responseTimePeriods([$address->id]);
+        $hasData = collect($periods['values'])->filter(fn ($v) => $v !== null)->isNotEmpty();
+
+        return [
+            'labels' => $periods['labels'],
+            'keys' => $periods['keys'],
+            'series' => [[
+                'id' => $address->id,
+                'label' => $address->name ?: $address->endpoint,
+                'values' => $periods['values'],
+                'counts' => $periods['counts'],
+            ]],
+            'has_data' => $hasData,
+        ];
     }
 
     /**

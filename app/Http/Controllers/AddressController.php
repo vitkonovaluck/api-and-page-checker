@@ -55,6 +55,7 @@ class AddressController extends Controller
         $previous = $latest?->previous();
         $diff = $latest ? $diffService->compare($previous, $latest) : null;
         $stats = $checkStats->forSnapshots($address->snapshots);
+        $responseTimeChart = $checkStats->responseTimeChartForAddress($address);
 
         return view('addresses.show', [
             'site' => $site,
@@ -63,6 +64,7 @@ class AddressController extends Controller
             'latest' => $latest,
             'diff' => $diff,
             'stats' => $stats,
+            'responseTimeChart' => $responseTimeChart,
         ]);
     }
 

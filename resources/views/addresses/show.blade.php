@@ -30,6 +30,13 @@
         </div>
     </div>
 
+    @include('partials.response-time-chart', [
+        'chart' => $responseTimeChart,
+        'chartId' => 'address-response-time-chart',
+        'title' => 'Історія часу відповіді',
+        'subtitle' => 'Середнє за періоди: останній час, 6 / 12 / 24 / 48 / 96 год, 1 тиждень',
+    ])
+
     @if ($diff && $latest)
         <div class="mb-8">
             @include('partials.diff', ['diff' => $diff])

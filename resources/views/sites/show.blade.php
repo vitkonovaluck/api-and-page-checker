@@ -181,6 +181,13 @@
         </form>
     </dialog>
 
+    @include('partials.response-time-chart', [
+        'chart' => $responseTimeChart,
+        'chartId' => 'site-response-time-chart',
+        'title' => 'Історія часу відповіді адрес',
+        'subtitle' => 'Середнє за періоди: останній час, 6 / 12 / 24 / 48 / 96 год, 1 тиждень',
+    ])
+
     @if (($scheduleStats && $scheduleStats['checks_count'] > 0) || ($siteStats['checks_count'] ?? 0) > 0)
         <section class="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 class="mb-1 text-base font-semibold text-slate-900">Середні показники перевірок</h2>

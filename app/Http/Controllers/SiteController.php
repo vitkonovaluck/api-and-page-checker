@@ -58,8 +58,15 @@ class SiteController extends Controller
             ? $checkStats->forSite($site, scheduledOnly: true)
             : null;
         $siteStats = $checkStats->forSite($site, scheduledOnly: false);
+        $responseTimeChart = $checkStats->responseTimeChartForSite($site);
 
-        return view('sites.show', compact('site', 'addressStats', 'scheduleStats', 'siteStats'));
+        return view('sites.show', compact(
+            'site',
+            'addressStats',
+            'scheduleStats',
+            'siteStats',
+            'responseTimeChart',
+        ));
     }
 
     public function update(Request $request, Site $site): RedirectResponse

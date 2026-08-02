@@ -81,6 +81,55 @@ class CheckStatsTest extends TestCase
         $this->assertSame(1.5, $stats['avg_errors_per_run']); // (1+2)/2
     }
 
+    public function test_response_time_periods_use_rolling_windows(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/data',
+        ]);
+
+        $this->createSnapshot($address, 500, null, now()->subHours(30)->toDateTimeString());
+        $this->createSnapshot($address, 100, null, now()->subHours(2)->toDateTimeString());
+        $this->createSnapshot($address, 200, null, now()->subMinutes(10)->toDateTimeString());
+
+        $periods = app(CheckStats::class)->responseTimePeriods([$address->id]);
+
+        $this->assertSame(['Останній', '6 год', '12 год', '24 год', '48 год', '96 год', '1 тиждень'], $periods['labels']);
+        $this->assertSame(200, $periods['values'][0]); // latest
+        $this->assertSame(150, $periods['values'][1]); // 6h: (100+200)/2
+        $this->assertSame(150, $periods['values'][2]); // 12h
+        $this->assertSame(150, $periods['values'][3]); // 24h
+        $this->assertSame(267, $periods['values'][4]); // 48h: (500+100+200)/3 ≈ 266.67
+    }
+
+    public function test_site_and_address_pages_show_response_time_chart(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Chart Site',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'name' => 'Users',
+            'endpoint' => '/users',
+        ]);
+        $this->createSnapshot($address, 120, null);
+
+        $this->get("/sites/{$site->id}")
+            ->assertOk()
+            ->assertSee('Історія часу відповіді адрес')
+            ->assertSee('site-response-time-chart');
+
+        $this->get("/sites/{$site->id}/addresses/{$address->id}")
+            ->assertOk()
+            ->assertSee('Історія часу відповіді')
+            ->assertSee('address-response-time-chart');
+    }
+
     public function test_site_page_shows_average_stats(): void
     {
         $site = Site::query()->create([
