@@ -23,7 +23,7 @@ class AddressController extends Controller
             'endpoint' => [
                 'required',
                 'string',
-                'max:2048',
+                'max:766',
                 Rule::unique('addresses', 'endpoint')->where(fn ($q) => $q->where('site_id', $site->id)),
             ],
             'name' => ['nullable', 'string', 'max:255'],

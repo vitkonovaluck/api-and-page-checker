@@ -17,7 +17,7 @@ return new class extends Migration
         });
 
         Schema::table('addresses', function (Blueprint $table) {
-            $table->string('endpoint', 2048)->default('/')->after('name');
+            $table->string('endpoint', 766)->default('/')->after('name');
             $table->boolean('schedule_enabled')->default(true)->after('endpoint');
         });
 
@@ -61,6 +61,7 @@ return new class extends Migration
         }
 
         Schema::table('addresses', function (Blueprint $table) {
+            $table->index('site_id');
             $table->dropUnique(['site_id', 'url']);
         });
 
@@ -70,17 +71,19 @@ return new class extends Migration
 
         Schema::table('addresses', function (Blueprint $table) {
             $table->unique(['site_id', 'endpoint']);
+            $table->dropIndex(['site_id']);
         });
     }
 
     public function down(): void
     {
         Schema::table('addresses', function (Blueprint $table) {
+            $table->index('site_id');
             $table->dropUnique(['site_id', 'endpoint']);
         });
 
         Schema::table('addresses', function (Blueprint $table) {
-            $table->string('url', 2048)->default('http://localhost')->after('name');
+            $table->string('url', 766)->default('http://localhost')->after('name');
         });
 
         $addresses = DB::table('addresses')
@@ -96,6 +99,7 @@ return new class extends Migration
         Schema::table('addresses', function (Blueprint $table) {
             $table->dropColumn(['endpoint', 'schedule_enabled']);
             $table->unique(['site_id', 'url']);
+            $table->dropIndex(['site_id']);
         });
 
         Schema::table('sites', function (Blueprint $table) {

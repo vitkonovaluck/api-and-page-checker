@@ -27,7 +27,7 @@ class SiteController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'base_url' => ['required', 'url', 'max:2048'],
-            'endpoint' => ['nullable', 'string', 'max:2048'],
+            'endpoint' => ['nullable', 'string', 'max:766'],
             'address_name' => ['nullable', 'string', 'max:255'],
         ]);
 
