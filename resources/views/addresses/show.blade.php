@@ -69,6 +69,22 @@
     <section class="rounded-xl border border-slate-200 bg-white shadow-sm">
         <div class="border-b border-slate-200 px-5 py-4">
             <h2 class="text-base font-semibold text-slate-900">Історія знімків</h2>
+            @if (($stats['checks_count'] ?? 0) > 0)
+                <dl class="mt-3 grid gap-3 sm:grid-cols-3">
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                        <dt class="text-xs uppercase tracking-wide text-slate-500">Середній час</dt>
+                        <dd class="mt-0.5 text-sm font-semibold text-slate-900">{{ $stats['avg_response_time_ms'] }} ms</dd>
+                    </div>
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                        <dt class="text-xs uppercase tracking-wide text-slate-500">Середня к-сть помилок</dt>
+                        <dd class="mt-0.5 text-sm font-semibold text-slate-900">{{ $stats['avg_errors'] }}</dd>
+                    </div>
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                        <dt class="text-xs uppercase tracking-wide text-slate-500">Помилок / перевірок</dt>
+                        <dd class="mt-0.5 text-sm font-semibold text-slate-900">{{ $stats['error_count'] }} / {{ $stats['checks_count'] }}</dd>
+                    </div>
+                </dl>
+            @endif
         </div>
 
         @if ($snapshots->isEmpty())

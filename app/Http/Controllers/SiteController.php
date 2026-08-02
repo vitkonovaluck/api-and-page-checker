@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Site;
+use App\Services\CheckStats;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -48,11 +49,17 @@ class SiteController extends Controller
             ->with('success', 'Сайт створено.');
     }
 
-    public function show(Site $site): View
+    public function show(Site $site, CheckStats $checkStats): View
     {
         $site->load(['addresses' => fn ($q) => $q->with('latestSnapshot')->orderBy('id')]);
 
-        return view('sites.show', compact('site'));
+        $addressStats = $checkStats->forAddresses($site->addresses);
+        $scheduleStats = $site->schedule_enabled
+            ? $checkStats->forSite($site, scheduledOnly: true)
+            : null;
+        $siteStats = $checkStats->forSite($site, scheduledOnly: false);
+
+        return view('sites.show', compact('site', 'addressStats', 'scheduleStats', 'siteStats'));
     }
 
     public function update(Request $request, Site $site): RedirectResponse
