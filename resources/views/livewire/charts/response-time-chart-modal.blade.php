@@ -1,7 +1,9 @@
 <div>
     <dialog
+        wire:ignore.self
         x-data
-        x-effect="$wire.show ? $el.showModal() : ($el.open && $el.close())"
+        x-effect="$wire.show ? ($el.open || $el.showModal()) : ($el.open && $el.close())"
+        @close="$wire.close()"
         @click="if ($event.target === $el) $wire.close()"
         class="w-[calc(100%-2rem)] max-w-4xl rounded-xl border border-slate-200 bg-white p-0 shadow-xl backdrop:bg-slate-900/40"
     >
@@ -119,7 +121,15 @@
         };
 
         $wire.on('chart-should-render', () => {
-            queueMicrotask(() => requestAnimationFrame(renderChart));
+            queueMicrotask(() => requestAnimationFrame(() => {
+                if ($wire.show) {
+                    const dialog = $wire.$el?.querySelector?.('dialog');
+                    if (dialog && !dialog.open) {
+                        dialog.showModal();
+                    }
+                }
+                renderChart();
+            }));
         });
 
         $wire.$watch('show', (value) => {
