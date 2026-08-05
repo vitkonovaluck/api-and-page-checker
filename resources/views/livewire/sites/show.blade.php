@@ -99,6 +99,15 @@
                     </div>
                 @endif
                 <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                    <dt class="text-xs uppercase tracking-wide text-slate-500">Сер. час (остання)</dt>
+                    <dd class="mt-1 text-lg font-semibold text-slate-900">
+                        {{ $siteStats['avg_latest_response_time_ms'] !== null ? $siteStats['avg_latest_response_time_ms'].' ms' : '—' }}
+                    </dd>
+                    <p class="mt-1 text-xs text-slate-500">
+                        середнє по останніх знімках · {{ $siteStats['latest_checks_count'] }} адрес
+                    </p>
+                </div>
+                <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
                     <dt class="text-xs uppercase tracking-wide text-slate-500">Сер. час (усі)</dt>
                     <dd class="mt-1 text-lg font-semibold text-slate-900">
                         {{ $siteStats['avg_response_time_ms'] !== null ? $siteStats['avg_response_time_ms'].' ms' : '—' }}
