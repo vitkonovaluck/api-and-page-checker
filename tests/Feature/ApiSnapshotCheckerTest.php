@@ -2,6 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Addresses\AddressSettingsModal;
+use App\Livewire\Addresses\CreateAddressModal;
+use App\Livewire\Charts\ResponseTimeChartModal;
+use App\Livewire\Sites\CreateSiteModal;
+use App\Livewire\Sites\SiteSettingsModal;
 use App\Models\Address;
 use App\Models\Site;
 use App\Models\Snapshot;
@@ -9,6 +14,7 @@ use App\Services\DiffService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class ApiSnapshotCheckerTest extends TestCase
@@ -19,17 +25,19 @@ class ApiSnapshotCheckerTest extends TestCase
     {
         $this->get('/')
             ->assertOk()
-            ->assertSee('Список сайтів');
+            ->assertSee('Список сайтів')
+            ->assertSeeLivewire(CreateSiteModal::class);
     }
 
     public function test_can_create_site_with_optional_endpoint(): void
     {
-        $this->post('/sites', [
-            'name' => 'Demo Shop',
-            'base_url' => 'https://api.example.com',
-            'endpoint' => '/users',
-            'address_name' => 'Users',
-        ])->assertRedirect();
+        Livewire::test(CreateSiteModal::class)
+            ->set('name', 'Demo Shop')
+            ->set('base_url', 'https://api.example.com')
+            ->set('endpoint', '/users')
+            ->set('address_name', 'Users')
+            ->call('save')
+            ->assertRedirect();
 
         $site = Site::query()->first();
         $this->assertNotNull($site);
@@ -176,16 +184,17 @@ class ApiSnapshotCheckerTest extends TestCase
             'base_url' => 'https://api.example.com',
         ]);
 
-        $this->post("/sites/{$site->id}/addresses", [
-            'endpoint' => '/secure',
-            'name' => 'Secure',
-            'schedule_enabled' => '1',
-            'headers' => [
+        Livewire::test(CreateAddressModal::class, ['site' => $site])
+            ->set('endpoint', '/secure')
+            ->set('name', 'Secure')
+            ->set('schedule_enabled', true)
+            ->set('headers', [
                 ['name' => 'Authorization', 'value' => 'Bearer token-123'],
                 ['name' => '', 'value' => 'ignored'],
                 ['name' => 'X-Api-Key', 'value' => 'abc'],
-            ],
-        ])->assertRedirect("/sites/{$site->id}");
+            ])
+            ->call('save')
+            ->assertRedirect("/sites/{$site->id}");
 
         $address = $site->addresses()->first();
         $this->assertNotNull($address);
@@ -208,11 +217,11 @@ class ApiSnapshotCheckerTest extends TestCase
             'request_headers' => ['Old' => 'value'],
         ]);
 
-        $this->put("/sites/{$site->id}/addresses/{$address->id}", [
-            'headers' => [
+        Livewire::test(AddressSettingsModal::class, ['site' => $site, 'address' => $address])
+            ->set('headers', [
                 ['name' => 'Authorization', 'value' => 'Bearer new'],
-            ],
-        ])
+            ])
+            ->call('save')
             ->assertRedirect("/sites/{$site->id}/addresses/{$address->id}")
             ->assertSessionHas('success', 'Налаштування адреси збережено.');
 
@@ -220,6 +229,50 @@ class ApiSnapshotCheckerTest extends TestCase
             ['Authorization' => 'Bearer new'],
             $address->fresh()->request_headers,
         );
+    }
+
+    public function test_response_time_chart_modal_switches_period(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/data',
+        ]);
+        Snapshot::query()->create([
+            'address_id' => $address->id,
+            'status_code' => 200,
+            'headers' => [],
+            'body' => '{}',
+            'body_hash' => hash('sha256', '{}'),
+            'response_time_ms' => 42,
+        ]);
+
+        Livewire::test(ResponseTimeChartModal::class, [
+            'mode' => 'site',
+            'siteId' => $site->id,
+            'title' => 'Історія часу відповіді адрес',
+            'chartId' => 'site-response-time-chart',
+        ])
+            ->call('open')
+            ->assertSet('show', true)
+            ->assertSee('Період вибірки')
+            ->assertSee('site-response-time-chart')
+            ->call('setPeriod', '6h')
+            ->assertSet('period', '6h');
+
+        Livewire::test(ResponseTimeChartModal::class, [
+            'mode' => 'address',
+            'addressId' => $address->id,
+            'title' => 'Історія часу відповіді',
+            'chartId' => 'address-response-time-chart',
+        ])
+            ->call('open')
+            ->assertSee('address-response-time-chart')
+            ->call('setPeriod', '12h')
+            ->assertSet('period', '12h');
     }
 
     public function test_check_sends_custom_request_headers(): void
@@ -340,5 +393,57 @@ class ApiSnapshotCheckerTest extends TestCase
             ->assertSessionHas('success', 'Знімок видалено.');
 
         $this->assertDatabaseMissing('snapshots', ['id' => $snapshot->id]);
+    }
+
+    public function test_can_clear_all_site_snapshots_from_settings(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $a1 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/one',
+        ]);
+        $a2 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/two',
+        ]);
+
+        foreach ([$a1, $a2] as $address) {
+            Snapshot::query()->create([
+                'address_id' => $address->id,
+                'status_code' => 200,
+                'headers' => [],
+                'body' => '{}',
+                'body_hash' => hash('sha256', '{}'),
+                'response_time_ms' => 10,
+            ]);
+        }
+
+        $otherSite = Site::query()->create([
+            'name' => 'Other',
+            'base_url' => 'https://other.example.com',
+        ]);
+        $otherAddress = Address::query()->create([
+            'site_id' => $otherSite->id,
+            'endpoint' => '/keep',
+        ]);
+        Snapshot::query()->create([
+            'address_id' => $otherAddress->id,
+            'status_code' => 200,
+            'headers' => [],
+            'body' => '{}',
+            'body_hash' => hash('sha256', '{}'),
+            'response_time_ms' => 5,
+        ]);
+
+        Livewire::test(SiteSettingsModal::class, ['site' => $site])
+            ->call('clearSnapshots')
+            ->assertRedirect("/sites/{$site->id}")
+            ->assertSessionHas('success', 'Видалено знімків: 2.');
+
+        $this->assertSame(0, $site->snapshots()->count());
+        $this->assertSame(1, $otherSite->snapshots()->count());
     }
 }

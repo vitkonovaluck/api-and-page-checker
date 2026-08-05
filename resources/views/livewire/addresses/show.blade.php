@@ -1,17 +1,9 @@
-@extends('layouts.app')
-
-@section('title', ($address->name ?: $address->endpoint).' — API Snapshot Checker')
-
-@section('content')
-    @php
-        $openSettingsModal = old('headers') !== null;
-    @endphp
-
+<div>
     <div class="mb-6">
         <nav class="mb-2 text-sm text-slate-500">
-            <a href="{{ route('sites.index') }}" class="text-sky-700 hover:underline">Сайти</a>
+            <a href="{{ route('sites.index') }}" wire:navigate class="text-sky-700 hover:underline">Сайти</a>
             <span class="mx-1">/</span>
-            <a href="{{ route('sites.show', $site) }}" class="text-sky-700 hover:underline">{{ $site->name }}</a>
+            <a href="{{ route('sites.show', $site) }}" wire:navigate class="text-sky-700 hover:underline">{{ $site->name }}</a>
             <span class="mx-1">/</span>
             <span class="text-slate-700">{{ $address->name ?: 'Адреса' }}</span>
         </nav>
@@ -28,11 +20,18 @@
             <div class="flex flex-wrap gap-2">
                 <button
                     type="button"
-                    id="open-address-settings"
+                    wire:click="$dispatch('open-address-settings')"
                     class="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
                 >
                     @include('partials.icons.cog')
                     Налаштування
+                </button>
+                <button
+                    type="button"
+                    wire:click="$dispatch('open-response-time-chart')"
+                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                >
+                    Графік
                 </button>
                 <form method="POST" action="{{ route('addresses.check', [$site, $address]) }}">
                     @csrf
@@ -44,60 +43,14 @@
         </div>
     </div>
 
-    <dialog
-        id="address-settings-modal"
-        class="w-[calc(100%-2rem)] max-w-2xl rounded-xl border border-slate-200 bg-white p-0 shadow-xl backdrop:bg-slate-900/40"
-        @if ($openSettingsModal) data-open-on-load="1" @endif
-    >
-        <form method="POST" action="{{ route('addresses.update', [$site, $address]) }}" class="flex max-h-[85vh] flex-col">
-            @csrf
-            @method('PUT')
-
-            <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
-                <div>
-                    <h2 class="text-base font-semibold text-slate-900">Налаштування адреси</h2>
-                    <p class="mt-0.5 text-sm text-slate-500">Header-параметри запиту</p>
-                </div>
-                <button
-                    type="button"
-                    id="close-address-settings"
-                    class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-                    title="Закрити"
-                    aria-label="Закрити"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-
-            <div class="overflow-y-auto px-5 py-5">
-                @include('partials.request-headers-editor', [
-                    'editorId' => 'address-settings-headers',
-                    'headers' => $address->request_headers ?? [],
-                ])
-            </div>
-
-            <div class="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
-                <button
-                    type="button"
-                    id="cancel-address-settings"
-                    class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
-                >
-                    Скасувати
-                </button>
-                <button type="submit" class="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
-                    Зберегти
-                </button>
-            </div>
-        </form>
-    </dialog>
-
-    @include('partials.response-time-chart', [
-        'chart' => $responseTimeChart,
-        'chartId' => 'address-response-time-chart',
-        'title' => 'Історія часу відповіді',
-    ])
+    <livewire:addresses.address-settings-modal :site="$site" :address="$address" :key="'addr-settings-'.$address->id" />
+    <livewire:charts.response-time-chart-modal
+        mode="address"
+        :address-id="$address->id"
+        title="Історія часу відповіді"
+        chart-id="address-response-time-chart"
+        :key="'chart-address-'.$address->id"
+    />
 
     @if ($diff && $latest)
         <div class="mb-8">
@@ -128,7 +81,7 @@
                 <pre class="max-h-80 overflow-auto rounded-lg border border-slate-200 bg-slate-950 p-4 text-xs text-slate-100"><code>{{ $latest->body }}</code></pre>
             </div>
             <div class="mt-4">
-                <a href="{{ route('addresses.snapshots.show', [$site, $address, $latest]) }}" class="text-sm text-sky-700 hover:underline">
+                <a href="{{ route('addresses.snapshots.show', [$site, $address, $latest]) }}" wire:navigate class="text-sm text-sky-700 hover:underline">
                     Відкрити деталі знімка →
                 </a>
             </div>
@@ -173,7 +126,7 @@
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         @foreach ($snapshots as $snapshot)
-                            <tr class="hover:bg-slate-50/80">
+                            <tr class="hover:bg-slate-50/80" wire:key="snapshot-{{ $snapshot->id }}">
                                 <td class="px-5 py-3 font-mono text-xs text-slate-500">{{ $snapshot->id }}</td>
                                 <td class="px-5 py-3">{{ $snapshot->created_at->format('d.m.Y H:i:s') }}</td>
                                 <td class="px-5 py-3">{{ $snapshot->status_code ?? '—' }}</td>
@@ -189,24 +142,23 @@
                                     <div class="flex flex-wrap justify-end gap-1.5">
                                         <a
                                             href="{{ route('addresses.snapshots.show', [$site, $address, $snapshot]) }}"
+                                            wire:navigate
                                             title="Деталі"
                                             aria-label="Деталі"
                                             class="inline-flex items-center justify-center rounded-lg border border-slate-300 p-2 text-slate-700 hover:bg-slate-100"
                                         >
                                             @include('partials.icons.eye')
                                         </a>
-                                        <form method="POST" action="{{ route('addresses.snapshots.destroy', [$site, $address, $snapshot]) }}" onsubmit="return confirm('Видалити цей знімок?')">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button
-                                                type="submit"
-                                                title="Видалити"
-                                                aria-label="Видалити"
-                                                class="inline-flex items-center justify-center rounded-lg border border-red-200 p-2 text-red-700 hover:bg-red-50"
-                                            >
-                                                @include('partials.icons.trash')
-                                            </button>
-                                        </form>
+                                        <button
+                                            type="button"
+                                            wire:click="deleteSnapshot({{ $snapshot->id }})"
+                                            wire:confirm="Видалити цей знімок?"
+                                            title="Видалити"
+                                            aria-label="Видалити"
+                                            class="inline-flex items-center justify-center rounded-lg border border-red-200 p-2 text-red-700 hover:bg-red-50"
+                                        >
+                                            @include('partials.icons.trash')
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -214,43 +166,12 @@
                     </tbody>
                 </table>
             </div>
+
+            @if ($snapshots->hasPages())
+                <div class="border-t border-slate-200 px-5 py-4">
+                    {{ $snapshots->links() }}
+                </div>
+            @endif
         @endif
     </section>
-
-    <script>
-        (() => {
-            const modal = document.getElementById('address-settings-modal');
-            if (!modal) return;
-
-            const open = () => {
-                if (typeof modal.showModal === 'function') {
-                    modal.showModal();
-                } else {
-                    modal.setAttribute('open', '');
-                }
-            };
-
-            const close = () => {
-                if (typeof modal.close === 'function') {
-                    modal.close();
-                } else {
-                    modal.removeAttribute('open');
-                }
-            };
-
-            document.getElementById('open-address-settings')?.addEventListener('click', open);
-            document.getElementById('close-address-settings')?.addEventListener('click', close);
-            document.getElementById('cancel-address-settings')?.addEventListener('click', close);
-
-            modal.addEventListener('click', (event) => {
-                if (event.target === modal) {
-                    close();
-                }
-            });
-
-            if (modal.dataset.openOnLoad === '1') {
-                open();
-            }
-        })();
-    </script>
-@endsection
+</div>

@@ -86,7 +86,9 @@ class CheckStats
      *     avg_errors: float|null,
      *     runs_count: int,
      *     avg_errors_per_run: float|null,
-     *     avg_response_time_per_run_ms: int|null
+     *     avg_response_time_per_run_ms: int|null,
+     *     avg_latest_response_time_ms: int|null,
+     *     latest_checks_count: int
      * }
      */
     public function forSite(Site $site, bool $scheduledOnly = false): array
@@ -103,6 +105,8 @@ class CheckStats
                 'runs_count' => 0,
                 'avg_errors_per_run' => null,
                 'avg_response_time_per_run_ms' => null,
+                'avg_latest_response_time_ms' => null,
+                'latest_checks_count' => 0,
             ]);
         }
 
@@ -125,6 +129,23 @@ class CheckStats
 
         $runsCount = $runBuckets->count();
 
+        $latestSnapshotIds = Snapshot::query()
+            ->whereIn('address_id', $addressIds)
+            ->selectRaw('MAX(id) as id')
+            ->groupBy('address_id')
+            ->pluck('id');
+
+        $latestChecksCount = $latestSnapshotIds->count();
+        $avgLatestResponseTimeMs = null;
+
+        if ($latestChecksCount > 0) {
+            $avgLatestResponseTimeMs = (int) round(
+                (float) Snapshot::query()
+                    ->whereIn('id', $latestSnapshotIds)
+                    ->avg('response_time_ms')
+            );
+        }
+
         return array_merge($base, [
             'runs_count' => $runsCount,
             'avg_errors_per_run' => $runsCount > 0
@@ -133,6 +154,8 @@ class CheckStats
             'avg_response_time_per_run_ms' => $runsCount > 0
                 ? (int) round((float) $runBuckets->avg('avg_response_time_ms'))
                 : null,
+            'avg_latest_response_time_ms' => $avgLatestResponseTimeMs,
+            'latest_checks_count' => $latestChecksCount,
         ]);
     }
 

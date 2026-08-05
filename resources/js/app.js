@@ -1,1 +1,1 @@
-//
+import './response-time-chart';

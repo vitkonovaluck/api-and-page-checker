@@ -81,6 +81,34 @@ class CheckStatsTest extends TestCase
         $this->assertSame(1.5, $stats['avg_errors_per_run']); // (1+2)/2
     }
 
+    public function test_computes_average_latest_response_time_for_site(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $a1 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/one',
+        ]);
+        $a2 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/two',
+        ]);
+
+        $this->createSnapshot($a1, 100, null, '2026-08-01 10:00:00');
+        $this->createSnapshot($a1, 400, null, '2026-08-01 11:00:00'); // latest for a1
+        $this->createSnapshot($a2, 200, null, '2026-08-01 10:00:00');
+        $this->createSnapshot($a2, 300, null, '2026-08-01 11:00:00'); // latest for a2
+
+        $stats = app(CheckStats::class)->forSite($site);
+
+        $this->assertSame(4, $stats['checks_count']);
+        $this->assertSame(250, $stats['avg_response_time_ms']); // all four
+        $this->assertSame(350, $stats['avg_latest_response_time_ms']); // (400+300)/2
+        $this->assertSame(2, $stats['latest_checks_count']);
+    }
+
     public function test_address_chart_uses_selected_period_sample(): void
     {
         $site = Site::query()->create([
@@ -148,17 +176,15 @@ class CheckStatsTest extends TestCase
         ]);
         $this->createSnapshot($address, 120, null);
 
-        $this->get("/sites/{$site->id}?period=6h")
+        $this->get("/sites/{$site->id}")
             ->assertOk()
-            ->assertSee('Історія часу відповіді адрес')
-            ->assertSee('Період вибірки')
-            ->assertSee('site-response-time-chart')
-            ->assertSee('Середнє значення часу відповіді по всіх адресах');
+            ->assertSee('Графік')
+            ->assertSeeLivewire(\App\Livewire\Charts\ResponseTimeChartModal::class)
+            ->assertSee('site-response-time-chart');
 
-        $this->get("/sites/{$site->id}/addresses/{$address->id}?period=12h")
+        $this->get("/sites/{$site->id}/addresses/{$address->id}")
             ->assertOk()
-            ->assertSee('Історія часу відповіді')
-            ->assertSee('Час відповіді адреси за обраний період')
+            ->assertSee('Графік')
             ->assertSee('address-response-time-chart');
     }
 
@@ -184,6 +210,7 @@ class CheckStatsTest extends TestCase
             ->assertSee('Середні показники перевірок')
             ->assertSee('Сер. час (розклад)')
             ->assertSee('Сер. помилок / запуск')
+            ->assertSee('Сер. час (остання)')
             ->assertSee('200 ms')
             ->assertSee('Сер. час');
     }
