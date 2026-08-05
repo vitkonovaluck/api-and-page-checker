@@ -135,6 +135,10 @@ class ApiSnapshotCheckerTest extends TestCase
             'name' => 'Users',
             'endpoint' => '/users',
             'schedule_enabled' => true,
+            'request_headers' => [
+                'Authorization' => 'Bearer secret',
+                'X-Custom' => 'yes',
+            ],
         ]);
         Snapshot::query()->create([
             'address_id' => $address->id,
@@ -155,8 +159,98 @@ class ApiSnapshotCheckerTest extends TestCase
         $this->assertSame('15m', $copy->schedule_interval);
         $this->assertNull($copy->schedule_last_run_at);
         $this->assertSame(1, $copy->addresses()->count());
-        $this->assertSame('/users', $copy->addresses()->first()->endpoint);
-        $this->assertSame(0, $copy->addresses()->first()->snapshots()->count());
+        $copiedAddress = $copy->addresses()->first();
+        $this->assertSame('/users', $copiedAddress->endpoint);
+        $this->assertSame([
+            'Authorization' => 'Bearer secret',
+            'X-Custom' => 'yes',
+        ], $copiedAddress->request_headers);
+        $this->assertSame(0, $copiedAddress->snapshots()->count());
+        $this->assertSame(1, $address->snapshots()->count());
+    }
+
+    public function test_can_create_address_with_request_headers(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+
+        $this->post("/sites/{$site->id}/addresses", [
+            'endpoint' => '/secure',
+            'name' => 'Secure',
+            'schedule_enabled' => '1',
+            'headers' => [
+                ['name' => 'Authorization', 'value' => 'Bearer token-123'],
+                ['name' => '', 'value' => 'ignored'],
+                ['name' => 'X-Api-Key', 'value' => 'abc'],
+            ],
+        ])->assertRedirect("/sites/{$site->id}");
+
+        $address = $site->addresses()->first();
+        $this->assertNotNull($address);
+        $this->assertSame('/secure', $address->endpoint);
+        $this->assertSame([
+            'Authorization' => 'Bearer token-123',
+            'X-Api-Key' => 'abc',
+        ], $address->request_headers);
+    }
+
+    public function test_can_update_address_request_headers(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/data',
+            'request_headers' => ['Old' => 'value'],
+        ]);
+
+        $this->put("/sites/{$site->id}/addresses/{$address->id}", [
+            'headers' => [
+                ['name' => 'Authorization', 'value' => 'Bearer new'],
+            ],
+        ])
+            ->assertRedirect("/sites/{$site->id}/addresses/{$address->id}")
+            ->assertSessionHas('success', 'Налаштування адреси збережено.');
+
+        $this->assertSame(
+            ['Authorization' => 'Bearer new'],
+            $address->fresh()->request_headers,
+        );
+    }
+
+    public function test_check_sends_custom_request_headers(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/secure',
+            'request_headers' => [
+                'Authorization' => 'Bearer custom-token',
+                'Accept' => 'application/xml',
+            ],
+        ]);
+
+        Http::fake([
+            'https://api.example.com/secure' => Http::response(['ok' => true], 200),
+        ]);
+
+        $this->post("/sites/{$site->id}/addresses/{$address->id}/check")
+            ->assertRedirect("/sites/{$site->id}/addresses/{$address->id}");
+
+        Http::assertSent(function ($request) {
+            return $request->url() === 'https://api.example.com/secure'
+                && $request->hasHeader('Authorization', 'Bearer custom-token')
+                && $request->hasHeader('Accept', 'application/xml')
+                && $request->hasHeader('User-Agent', 'API-Snapshot-Checker/1.0');
+        });
+
         $this->assertSame(1, $address->snapshots()->count());
     }
 
@@ -189,6 +283,30 @@ class ApiSnapshotCheckerTest extends TestCase
         $this->assertSame(1, $included->snapshots()->count());
         $this->assertSame(0, $excluded->snapshots()->count());
         $this->assertNotNull($site->fresh()->schedule_last_run_at);
+    }
+
+    public function test_scheduled_command_does_not_double_check_when_run_twice(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Scheduled',
+            'base_url' => 'https://api.example.com',
+            'schedule_enabled' => true,
+            'schedule_interval' => '5m',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/once',
+            'schedule_enabled' => true,
+        ]);
+
+        Http::fake([
+            'https://api.example.com/once' => Http::response(['ok' => true], 200),
+        ]);
+
+        Artisan::call('sites:run-scheduled');
+        Artisan::call('sites:run-scheduled');
+
+        $this->assertSame(1, $address->snapshots()->count());
     }
 
     public function test_settings_page_is_available(): void

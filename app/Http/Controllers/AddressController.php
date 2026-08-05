@@ -29,6 +29,9 @@ class AddressController extends Controller
             ],
             'name' => ['nullable', 'string', 'max:255'],
             'schedule_enabled' => ['sometimes', 'boolean'],
+            'headers' => ['nullable', 'array'],
+            'headers.*.name' => ['nullable', 'string', 'max:255'],
+            'headers.*.value' => ['nullable', 'string', 'max:2048'],
         ], [
             'endpoint.unique' => 'Цей ендпоїнт уже додано до сайту.',
         ]);
@@ -37,6 +40,7 @@ class AddressController extends Controller
             'name' => $validated['name'] ?? null,
             'endpoint' => $validated['endpoint'],
             'schedule_enabled' => $request->boolean('schedule_enabled'),
+            'request_headers' => $this->normalizeRequestHeaders($validated['headers'] ?? []),
         ]);
 
         return redirect()
@@ -44,8 +48,32 @@ class AddressController extends Controller
             ->with('success', 'Адресу додано.');
     }
 
-    public function show(Site $site, Address $address, DiffService $diffService, CheckStats $checkStats): View
+    public function update(Request $request, Site $site, Address $address): RedirectResponse
     {
+        abort_unless($address->site_id === $site->id, 404);
+
+        $validated = $request->validate([
+            'headers' => ['nullable', 'array'],
+            'headers.*.name' => ['nullable', 'string', 'max:255'],
+            'headers.*.value' => ['nullable', 'string', 'max:2048'],
+        ]);
+
+        $address->update([
+            'request_headers' => $this->normalizeRequestHeaders($validated['headers'] ?? []),
+        ]);
+
+        return redirect()
+            ->route('addresses.show', [$site, $address])
+            ->with('success', 'Налаштування адреси збережено.');
+    }
+
+    public function show(
+        Request $request,
+        Site $site,
+        Address $address,
+        DiffService $diffService,
+        CheckStats $checkStats,
+    ): View {
         abort_unless($address->site_id === $site->id, 404);
 
         $address->setRelation('site', $site);
@@ -55,7 +83,10 @@ class AddressController extends Controller
         $previous = $latest?->previous();
         $diff = $latest ? $diffService->compare($previous, $latest) : null;
         $stats = $checkStats->forSnapshots($address->snapshots);
-        $responseTimeChart = $checkStats->responseTimeChartForAddress($address);
+        $responseTimeChart = $checkStats->responseTimeChartForAddress(
+            $address,
+            $request->query('period'),
+        );
 
         return view('addresses.show', [
             'site' => $site,
@@ -122,5 +153,26 @@ class AddressController extends Controller
         }
 
         return $endpoint;
+    }
+
+    /**
+     * @param  array<int, array{name?: string|null, value?: string|null}>  $rows
+     * @return array<string, string>|null
+     */
+    private function normalizeRequestHeaders(array $rows): ?array
+    {
+        $headers = [];
+
+        foreach ($rows as $row) {
+            $name = trim((string) ($row['name'] ?? ''));
+
+            if ($name === '') {
+                continue;
+            }
+
+            $headers[$name] = (string) ($row['value'] ?? '');
+        }
+
+        return $headers === [] ? null : $headers;
     }
 }

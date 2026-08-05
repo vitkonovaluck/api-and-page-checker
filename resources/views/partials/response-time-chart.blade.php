@@ -1,23 +1,66 @@
 @php
-    /** @var array{labels: list<string>, keys: list<string>, series: list<array{id: int|string, label: string, values: list<int|null>, counts: list<int>}>, has_data: bool} $chart */
-    $chartId = $chartId ?? 'response-time-chart-'.substr(md5(json_encode($chart['series'] ?? []).uniqid('', true)), 0, 10);
+    /** @var array{
+     *   period: string,
+     *   period_label: string,
+     *   periods: array<string, array{label: string, hours: int}>,
+     *   labels: list<string>,
+     *   values: list<int>,
+     *   counts: list<int>,
+     *   avg_response_time_ms: int|null,
+     *   points_count: int,
+     *   checks_count: int,
+     *   has_data: bool,
+     *   mode: string,
+     *   series_label: string
+     * } $chart */
+    $chartId = $chartId ?? 'response-time-chart';
     $title = $title ?? 'Історія часу відповіді';
-    $subtitle = $subtitle ?? 'Середнє значення за періоди: останній час, 6 / 12 / 24 / 48 / 96 год, 1 тиждень';
+    $selectedPeriod = $chart['period'] ?? \App\Services\CheckStats::DEFAULT_RESPONSE_TIME_PERIOD;
+    $periods = $chart['periods'] ?? \App\Services\CheckStats::RESPONSE_TIME_PERIODS;
 @endphp
 
 <section class="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-    <div class="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+    <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
             <h2 class="text-base font-semibold text-slate-900">{{ $title }}</h2>
-            <p class="mt-0.5 text-sm text-slate-500">{{ $subtitle }}</p>
+            <p class="mt-0.5 text-sm text-slate-500">
+                @if (($chart['mode'] ?? '') === 'site')
+                    Середнє значення часу відповіді по всіх адресах за обраний період
+                @else
+                    Час відповіді адреси за обраний період
+                @endif
+            </p>
         </div>
-        @if (! empty($chart['series']) && count($chart['series']) > 1)
-            <p class="text-xs text-slate-400">Наведіть на точку, щоб побачити значення</p>
+        @if (($chart['avg_response_time_ms'] ?? null) !== null)
+            <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                <div class="text-xs uppercase tracking-wide text-slate-500">Середнє за період</div>
+                <div class="font-semibold text-slate-900">{{ $chart['avg_response_time_ms'] }} ms</div>
+                <div class="text-xs text-slate-500">{{ $chart['checks_count'] }} перевірок · {{ $chart['period_label'] }}</div>
+            </div>
         @endif
     </div>
 
+    <div class="mb-4">
+        <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Період вибірки</p>
+        <div class="flex flex-wrap gap-1.5">
+            @foreach ($periods as $key => $period)
+                <a
+                    href="{{ request()->fullUrlWithQuery(['period' => $key]) }}"
+                    class="rounded-lg px-3 py-1.5 text-sm font-medium transition
+                        {{ $selectedPeriod === $key
+                            ? 'bg-slate-900 text-white'
+                            : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-100' }}"
+                >
+                    {{ $period['label'] }}
+                </a>
+            @endforeach
+        </div>
+    </div>
+
     @if (empty($chart['has_data']))
-        <p class="py-8 text-center text-sm text-slate-500">Немає даних для графіка. Зробіть кілька перевірок.</p>
+        <p class="py-8 text-center text-sm text-slate-500">
+            Немає перевірок за період «{{ $chart['period_label'] ?? $selectedPeriod }}».
+        </p>
     @else
         <div class="relative w-full overflow-x-auto">
             <div
@@ -28,26 +71,23 @@
                 aria-label="{{ $title }}"
             ></div>
         </div>
-        <script type="application/json" id="{{ $chartId }}-data">@json($chart)</script>
-        @if (count($chart['series']) > 1)
-            <ul id="{{ $chartId }}-legend" class="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-600"></ul>
-        @endif
+        @php
+            $chartPayload = [
+                'labels' => $chart['labels'],
+                'values' => $chart['values'],
+                'counts' => $chart['counts'],
+                'series_label' => $chart['series_label'] ?? '',
+                'period_label' => $chart['period_label'] ?? '',
+            ];
+        @endphp
+        <script type="application/json" id="{{ $chartId }}-data">{!! json_encode($chartPayload, JSON_UNESCAPED_UNICODE) !!}</script>
     @endif
 </section>
 
 @once
     <script>
         (() => {
-            const COLORS = [
-                '#0f766e', // teal
-                '#0369a1', // sky
-                '#b45309', // amber
-                '#be123c', // rose
-                '#4338ca', // indigo
-                '#15803d', // green
-                '#c2410c', // orange
-                '#6d28d9', // violet
-            ];
+            const COLOR = '#0f766e';
 
             const initChart = (root) => {
                 if (!root || root.dataset.ready === '1') return;
@@ -63,23 +103,21 @@
                 }
 
                 const labels = chart.labels || [];
-                const series = (chart.series || []).filter((s) =>
-                    (s.values || []).some((v) => v !== null && v !== undefined)
-                );
+                const values = chart.values || [];
+                const counts = chart.counts || [];
 
-                if (!labels.length || !series.length) return;
+                if (!labels.length || !values.length) return;
 
                 const width = 720;
                 const height = 280;
-                const pad = { top: 24, right: 20, bottom: 44, left: 52 };
+                const pad = { top: 24, right: 20, bottom: 52, left: 52 };
                 const plotW = width - pad.left - pad.right;
                 const plotH = height - pad.top - pad.bottom;
 
-                const allValues = series.flatMap((s) => s.values.filter((v) => v !== null && v !== undefined));
-                const maxVal = Math.max(...allValues, 1);
-                const yMax = Math.ceil(maxVal * 1.15 / 50) * 50 || 50;
+                const maxVal = Math.max(...values, 1);
+                const yMax = Math.ceil((maxVal * 1.15) / 50) * 50 || 50;
 
-                const xAt = (i) => pad.left + (labels.length === 1 ? plotW / 2 : (i / (labels.length - 1)) * plotW);
+                const xAt = (i) => pad.left + (values.length === 1 ? plotW / 2 : (i / (values.length - 1)) * plotW);
                 const yAt = (v) => pad.top + plotH - (v / yMax) * plotH;
 
                 const ns = 'http://www.w3.org/2000/svg';
@@ -88,10 +126,8 @@
                 svg.setAttribute('class', 'h-64 w-full max-w-full');
                 svg.setAttribute('role', 'presentation');
 
-                const gridGroup = document.createElementNS(ns, 'g');
-                const ticks = 4;
-                for (let t = 0; t <= ticks; t++) {
-                    const value = Math.round((yMax / ticks) * t);
+                for (let t = 0; t <= 4; t++) {
+                    const value = Math.round((yMax / 4) * t);
                     const y = yAt(value);
                     const line = document.createElementNS(ns, 'line');
                     line.setAttribute('x1', String(pad.left));
@@ -100,7 +136,7 @@
                     line.setAttribute('y2', String(y));
                     line.setAttribute('stroke', '#e2e8f0');
                     line.setAttribute('stroke-width', '1');
-                    gridGroup.appendChild(line);
+                    svg.appendChild(line);
 
                     const text = document.createElementNS(ns, 'text');
                     text.setAttribute('x', String(pad.left - 8));
@@ -109,17 +145,18 @@
                     text.setAttribute('fill', '#64748b');
                     text.setAttribute('font-size', '11');
                     text.textContent = value + ' ms';
-                    gridGroup.appendChild(text);
+                    svg.appendChild(text);
                 }
-                svg.appendChild(gridGroup);
 
+                const labelStep = Math.max(1, Math.ceil(labels.length / 8));
                 labels.forEach((label, i) => {
+                    if (i % labelStep !== 0 && i !== labels.length - 1) return;
                     const text = document.createElementNS(ns, 'text');
                     text.setAttribute('x', String(xAt(i)));
-                    text.setAttribute('y', String(height - 14));
+                    text.setAttribute('y', String(height - 16));
                     text.setAttribute('text-anchor', 'middle');
                     text.setAttribute('fill', '#64748b');
-                    text.setAttribute('font-size', '11');
+                    text.setAttribute('font-size', '10');
                     text.textContent = label;
                     svg.appendChild(text);
                 });
@@ -128,6 +165,10 @@
                 tooltip.className = 'pointer-events-none absolute z-10 hidden rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 shadow-md';
                 root.style.position = 'relative';
                 root.appendChild(tooltip);
+
+                const tipHtml = (i) =>
+                    `<strong>${chart.series_label || 'Час відповіді'}</strong><br>${labels[i]}: ${values[i]} ms` +
+                    (counts[i] ? `<br><span class="text-slate-500">${counts[i]} перевірок</span>` : '');
 
                 const showTip = (evt, html) => {
                     const rect = root.getBoundingClientRect();
@@ -140,70 +181,31 @@
                 };
                 const hideTip = () => tooltip.classList.add('hidden');
 
-                const legend = document.getElementById(root.id + '-legend');
-                if (legend) legend.innerHTML = '';
+                if (values.length >= 2) {
+                    const points = values.map((value, i) => `${xAt(i)},${yAt(value)}`).join(' ');
+                    const path = document.createElementNS(ns, 'polyline');
+                    path.setAttribute('fill', 'none');
+                    path.setAttribute('stroke', COLOR);
+                    path.setAttribute('stroke-width', '2.5');
+                    path.setAttribute('stroke-linejoin', 'round');
+                    path.setAttribute('stroke-linecap', 'round');
+                    path.setAttribute('points', points);
+                    svg.appendChild(path);
+                }
 
-                series.forEach((serie, sIndex) => {
-                    const color = COLORS[sIndex % COLORS.length];
-                    const points = [];
-
-                    serie.values.forEach((value, i) => {
-                        if (value === null || value === undefined) return;
-                        points.push(`${xAt(i)},${yAt(value)}`);
-                    });
-
-                    if (points.length >= 2) {
-                        const path = document.createElementNS(ns, 'polyline');
-                        path.setAttribute('fill', 'none');
-                        path.setAttribute('stroke', color);
-                        path.setAttribute('stroke-width', serie.id === 'overall' ? '2.5' : '2');
-                        path.setAttribute('stroke-linejoin', 'round');
-                        path.setAttribute('stroke-linecap', 'round');
-                        if (serie.id === 'overall') {
-                            path.setAttribute('stroke-dasharray', '5 4');
-                        }
-                        path.setAttribute('points', points.join(' '));
-                        svg.appendChild(path);
-                    }
-
-                    serie.values.forEach((value, i) => {
-                        if (value === null || value === undefined) return;
-                        const circle = document.createElementNS(ns, 'circle');
-                        circle.setAttribute('cx', String(xAt(i)));
-                        circle.setAttribute('cy', String(yAt(value)));
-                        circle.setAttribute('r', '4');
-                        circle.setAttribute('fill', color);
-                        circle.setAttribute('stroke', '#fff');
-                        circle.setAttribute('stroke-width', '1.5');
-                        circle.style.cursor = 'pointer';
-
-                        const count = (serie.counts && serie.counts[i]) || 0;
-                        circle.addEventListener('mouseenter', (evt) => {
-                            showTip(
-                                evt,
-                                `<strong>${serie.label}</strong><br>${labels[i]}: ${value} ms` +
-                                    (count ? `<br><span class="text-slate-500">${count} перевірок</span>` : '')
-                            );
-                        });
-                        circle.addEventListener('mousemove', (evt) => {
-                            showTip(
-                                evt,
-                                `<strong>${serie.label}</strong><br>${labels[i]}: ${value} ms` +
-                                    (count ? `<br><span class="text-slate-500">${count} перевірок</span>` : '')
-                            );
-                        });
-                        circle.addEventListener('mouseleave', hideTip);
-                        svg.appendChild(circle);
-                    });
-
-                    if (legend) {
-                        const item = document.createElement('li');
-                        item.className = 'inline-flex items-center gap-1.5';
-                        item.innerHTML =
-                            `<span class="inline-block h-2.5 w-2.5 rounded-full" style="background:${color}"></span>` +
-                            `<span>${serie.label}</span>`;
-                        legend.appendChild(item);
-                    }
+                values.forEach((value, i) => {
+                    const circle = document.createElementNS(ns, 'circle');
+                    circle.setAttribute('cx', String(xAt(i)));
+                    circle.setAttribute('cy', String(yAt(value)));
+                    circle.setAttribute('r', '4');
+                    circle.setAttribute('fill', COLOR);
+                    circle.setAttribute('stroke', '#fff');
+                    circle.setAttribute('stroke-width', '1.5');
+                    circle.style.cursor = 'pointer';
+                    circle.addEventListener('mouseenter', (evt) => showTip(evt, tipHtml(i)));
+                    circle.addEventListener('mousemove', (evt) => showTip(evt, tipHtml(i)));
+                    circle.addEventListener('mouseleave', hideTip);
+                    svg.appendChild(circle);
                 });
 
                 root.appendChild(svg);

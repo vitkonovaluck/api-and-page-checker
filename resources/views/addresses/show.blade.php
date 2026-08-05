@@ -3,6 +3,10 @@
 @section('title', ($address->name ?: $address->endpoint).' — API Snapshot Checker')
 
 @section('content')
+    @php
+        $openSettingsModal = old('headers') !== null;
+    @endphp
+
     <div class="mb-6">
         <nav class="mb-2 text-sm text-slate-500">
             <a href="{{ route('sites.index') }}" class="text-sky-700 hover:underline">Сайти</a>
@@ -21,20 +25,78 @@
                     {{ $address->last_checked_at?->format('d.m.Y H:i:s') ?? 'ще не перевірялася' }}
                 </p>
             </div>
-            <form method="POST" action="{{ route('addresses.check', [$site, $address]) }}">
-                @csrf
-                <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">
-                    Зробити знімок
+            <div class="flex flex-wrap gap-2">
+                <button
+                    type="button"
+                    id="open-address-settings"
+                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                >
+                    @include('partials.icons.cog')
+                    Налаштування
                 </button>
-            </form>
+                <form method="POST" action="{{ route('addresses.check', [$site, $address]) }}">
+                    @csrf
+                    <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">
+                        Зробити знімок
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
+
+    <dialog
+        id="address-settings-modal"
+        class="w-[calc(100%-2rem)] max-w-2xl rounded-xl border border-slate-200 bg-white p-0 shadow-xl backdrop:bg-slate-900/40"
+        @if ($openSettingsModal) data-open-on-load="1" @endif
+    >
+        <form method="POST" action="{{ route('addresses.update', [$site, $address]) }}" class="flex max-h-[85vh] flex-col">
+            @csrf
+            @method('PUT')
+
+            <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+                <div>
+                    <h2 class="text-base font-semibold text-slate-900">Налаштування адреси</h2>
+                    <p class="mt-0.5 text-sm text-slate-500">Header-параметри запиту</p>
+                </div>
+                <button
+                    type="button"
+                    id="close-address-settings"
+                    class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                    title="Закрити"
+                    aria-label="Закрити"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="overflow-y-auto px-5 py-5">
+                @include('partials.request-headers-editor', [
+                    'editorId' => 'address-settings-headers',
+                    'headers' => $address->request_headers ?? [],
+                ])
+            </div>
+
+            <div class="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
+                <button
+                    type="button"
+                    id="cancel-address-settings"
+                    class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                >
+                    Скасувати
+                </button>
+                <button type="submit" class="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+                    Зберегти
+                </button>
+            </div>
+        </form>
+    </dialog>
 
     @include('partials.response-time-chart', [
         'chart' => $responseTimeChart,
         'chartId' => 'address-response-time-chart',
         'title' => 'Історія часу відповіді',
-        'subtitle' => 'Середнє за періоди: останній час, 6 / 12 / 24 / 48 / 96 год, 1 тиждень',
     ])
 
     @if ($diff && $latest)
@@ -154,4 +216,41 @@
             </div>
         @endif
     </section>
+
+    <script>
+        (() => {
+            const modal = document.getElementById('address-settings-modal');
+            if (!modal) return;
+
+            const open = () => {
+                if (typeof modal.showModal === 'function') {
+                    modal.showModal();
+                } else {
+                    modal.setAttribute('open', '');
+                }
+            };
+
+            const close = () => {
+                if (typeof modal.close === 'function') {
+                    modal.close();
+                } else {
+                    modal.removeAttribute('open');
+                }
+            };
+
+            document.getElementById('open-address-settings')?.addEventListener('click', open);
+            document.getElementById('close-address-settings')?.addEventListener('click', close);
+            document.getElementById('cancel-address-settings')?.addEventListener('click', close);
+
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) {
+                    close();
+                }
+            });
+
+            if (modal.dataset.openOnLoad === '1') {
+                open();
+            }
+        })();
+    </script>
 @endsection

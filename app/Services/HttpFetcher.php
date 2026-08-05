@@ -9,17 +9,20 @@ use Throwable;
 
 class HttpFetcher
 {
-    public function get(string $url): FetchResult
+    /**
+     * @param  array<string, string>  $headers
+     */
+    public function get(string $url, array $headers = []): FetchResult
     {
         $started = hrtime(true);
 
         try {
             $response = Http::timeout(30)
-                ->withHeaders([
+                ->withHeaders(array_merge([
                     'Accept' => 'application/json, text/plain, */*',
                     'User-Agent' => 'API-Snapshot-Checker/1.0',
                     'ngrok-skip-browser-warning' => 'true',
-                ])
+                ], $headers))
                 ->withOptions(['http_errors' => false])
                 ->get($url);
 

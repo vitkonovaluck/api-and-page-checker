@@ -90,4 +90,44 @@ class Site extends Model
 
         return $this->schedule_last_run_at->copy()->addMinutes($minutes)->lte($now);
     }
+
+    /**
+     * Atomically mark the site as started for this schedule tick.
+     * Returns false if another process already claimed it (or it is not due).
+     */
+    public function claimForScheduledCheck(?Carbon $now = null): bool
+    {
+        if (! $this->schedule_enabled) {
+            return false;
+        }
+
+        $minutes = $this->scheduleIntervalMinutes();
+        if ($minutes === null) {
+            return false;
+        }
+
+        $now ??= now();
+        $claimedAt = $now->copy();
+
+        $query = static::query()
+            ->whereKey($this->id)
+            ->where('schedule_enabled', true);
+
+        if ($this->schedule_last_run_at === null) {
+            $affected = $query
+                ->whereNull('schedule_last_run_at')
+                ->update(['schedule_last_run_at' => $claimedAt]);
+        } else {
+            $dueAtOrBefore = $now->copy()->subMinutes($minutes);
+            $affected = $query
+                ->where('schedule_last_run_at', '<=', $dueAtOrBefore)
+                ->update(['schedule_last_run_at' => $claimedAt]);
+        }
+
+        if ($affected > 0) {
+            $this->forceFill(['schedule_last_run_at' => $claimedAt]);
+        }
+
+        return $affected > 0;
+    }
 }

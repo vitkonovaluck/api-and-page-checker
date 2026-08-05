@@ -24,7 +24,8 @@ class RunScheduledSiteChecks extends Command
         $checked = 0;
 
         foreach ($sites as $site) {
-            if (! $site->isDueForScheduledCheck()) {
+            // Claim first so a second concurrent scheduler process skips this site.
+            if (! $site->claimForScheduledCheck()) {
                 continue;
             }
 
@@ -36,7 +37,6 @@ class RunScheduledSiteChecks extends Command
                 $checked++;
             }
 
-            $site->forceFill(['schedule_last_run_at' => now()])->save();
             $this->info("Site #{$site->id} ({$site->name}): checked {$site->addresses->count()} address(es).");
         }
 

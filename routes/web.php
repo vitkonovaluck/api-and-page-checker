@@ -16,6 +16,7 @@ Route::post('/sites/{site}/check', [CheckController::class, 'storeAll'])->name('
 
 Route::post('/sites/{site}/addresses', [AddressController::class, 'store'])->name('addresses.store');
 Route::get('/sites/{site}/addresses/{address}', [AddressController::class, 'show'])->name('addresses.show');
+Route::put('/sites/{site}/addresses/{address}', [AddressController::class, 'update'])->name('addresses.update');
 Route::delete('/sites/{site}/addresses/{address}', [AddressController::class, 'destroy'])->name('addresses.destroy');
 Route::post('/sites/{site}/addresses/{address}/check', [CheckController::class, 'store'])->name('addresses.check');
 Route::get('/sites/{site}/addresses/{address}/snapshots/{snapshot}', [AddressController::class, 'showSnapshot'])->name('addresses.snapshots.show');

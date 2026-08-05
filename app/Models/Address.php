@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['site_id', 'name', 'endpoint', 'schedule_enabled', 'last_checked_at'])]
+#[Fillable(['site_id', 'name', 'endpoint', 'schedule_enabled', 'request_headers', 'last_checked_at'])]
 class Address extends Model
 {
     protected function casts(): array
@@ -16,6 +16,7 @@ class Address extends Model
         return [
             'last_checked_at' => 'datetime',
             'schedule_enabled' => 'boolean',
+            'request_headers' => 'array',
         ];
     }
 

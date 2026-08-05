@@ -49,7 +49,7 @@ class SiteController extends Controller
             ->with('success', 'Сайт створено.');
     }
 
-    public function show(Site $site, CheckStats $checkStats): View
+    public function show(Request $request, Site $site, CheckStats $checkStats): View
     {
         $site->load(['addresses' => fn ($q) => $q->with('latestSnapshot')->orderBy('id')]);
 
@@ -58,7 +58,10 @@ class SiteController extends Controller
             ? $checkStats->forSite($site, scheduledOnly: true)
             : null;
         $siteStats = $checkStats->forSite($site, scheduledOnly: false);
-        $responseTimeChart = $checkStats->responseTimeChartForSite($site);
+        $responseTimeChart = $checkStats->responseTimeChartForSite(
+            $site,
+            $request->query('period'),
+        );
 
         return view('sites.show', compact(
             'site',
@@ -130,6 +133,7 @@ class SiteController extends Controller
                     'name' => $address->name,
                     'endpoint' => $address->endpoint,
                     'schedule_enabled' => $address->schedule_enabled,
+                    'request_headers' => $address->request_headers,
                     'last_checked_at' => null,
                 ]);
             }
