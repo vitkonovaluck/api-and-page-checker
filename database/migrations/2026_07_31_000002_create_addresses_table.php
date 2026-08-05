@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('site_id')->constrained()->cascadeOnDelete();
             $table->string('name')->nullable();
-            $table->string('url', 2048);
+            $table->string('url', 766);
             $table->timestamp('last_checked_at')->nullable();
             $table->timestamps();
 
