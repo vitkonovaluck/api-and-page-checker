@@ -185,7 +185,6 @@
         'chart' => $responseTimeChart,
         'chartId' => 'site-response-time-chart',
         'title' => 'Історія часу відповіді адрес',
-        'subtitle' => 'Середнє за періоди: останній час, 6 / 12 / 24 / 48 / 96 год, 1 тиждень',
     ])
 
     @if (($scheduleStats && $scheduleStats['checks_count'] > 0) || ($siteStats['checks_count'] ?? 0) > 0)
@@ -282,6 +281,14 @@
                     >
                     У розкладі
                 </label>
+            </div>
+            <div class="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                @include('partials.request-headers-editor', [
+                    'editorId' => 'create-address-headers',
+                    'headers' => [],
+                ])
+            </div>
+            <div class="sm:col-span-2">
                 <button type="submit" class="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
                     Додати адресу
                 </button>

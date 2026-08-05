@@ -81,7 +81,7 @@ class CheckStatsTest extends TestCase
         $this->assertSame(1.5, $stats['avg_errors_per_run']); // (1+2)/2
     }
 
-    public function test_response_time_periods_use_rolling_windows(): void
+    public function test_address_chart_uses_selected_period_sample(): void
     {
         $site = Site::query()->create([
             'name' => 'Demo',
@@ -96,14 +96,43 @@ class CheckStatsTest extends TestCase
         $this->createSnapshot($address, 100, null, now()->subHours(2)->toDateTimeString());
         $this->createSnapshot($address, 200, null, now()->subMinutes(10)->toDateTimeString());
 
-        $periods = app(CheckStats::class)->responseTimePeriods([$address->id]);
+        $chart6h = app(CheckStats::class)->responseTimeChartForAddress($address, '6h');
+        $this->assertSame('6h', $chart6h['period']);
+        $this->assertTrue($chart6h['has_data']);
+        $this->assertSame([100, 200], $chart6h['values']);
+        $this->assertSame(150, $chart6h['avg_response_time_ms']);
 
-        $this->assertSame(['Останній', '6 год', '12 год', '24 год', '48 год', '96 год', '1 тиждень'], $periods['labels']);
-        $this->assertSame(200, $periods['values'][0]); // latest
-        $this->assertSame(150, $periods['values'][1]); // 6h: (100+200)/2
-        $this->assertSame(150, $periods['values'][2]); // 12h
-        $this->assertSame(150, $periods['values'][3]); // 24h
-        $this->assertSame(267, $periods['values'][4]); // 48h: (500+100+200)/3 ≈ 266.67
+        $chart48h = app(CheckStats::class)->responseTimeChartForAddress($address, '48h');
+        $this->assertSame([500, 100, 200], $chart48h['values']);
+        $this->assertSame(267, $chart48h['avg_response_time_ms']);
+    }
+
+    public function test_site_chart_averages_all_addresses_in_period(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $a1 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/one',
+        ]);
+        $a2 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/two',
+        ]);
+
+        $bucket = now()->subMinutes(20)->format('Y-m-d H:i:00');
+        $this->createSnapshot($a1, 100, null, $bucket);
+        $this->createSnapshot($a2, 300, null, $bucket);
+
+        $chart = app(CheckStats::class)->responseTimeChartForSite($site, '6h');
+
+        $this->assertSame('site', $chart['mode']);
+        $this->assertTrue($chart['has_data']);
+        $this->assertSame([200], $chart['values']);
+        $this->assertSame(200, $chart['avg_response_time_ms']);
+        $this->assertSame(2, $chart['checks_count']);
     }
 
     public function test_site_and_address_pages_show_response_time_chart(): void
@@ -119,14 +148,17 @@ class CheckStatsTest extends TestCase
         ]);
         $this->createSnapshot($address, 120, null);
 
-        $this->get("/sites/{$site->id}")
+        $this->get("/sites/{$site->id}?period=6h")
             ->assertOk()
             ->assertSee('Історія часу відповіді адрес')
-            ->assertSee('site-response-time-chart');
+            ->assertSee('Період вибірки')
+            ->assertSee('site-response-time-chart')
+            ->assertSee('Середнє значення часу відповіді по всіх адресах');
 
-        $this->get("/sites/{$site->id}/addresses/{$address->id}")
+        $this->get("/sites/{$site->id}/addresses/{$address->id}?period=12h")
             ->assertOk()
             ->assertSee('Історія часу відповіді')
+            ->assertSee('Час відповіді адреси за обраний період')
             ->assertSee('address-response-time-chart');
     }
 

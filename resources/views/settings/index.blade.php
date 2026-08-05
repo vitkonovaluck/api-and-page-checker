@@ -69,6 +69,8 @@
             <p class="mt-3 text-sm text-slate-600">
                 Локально можна перевірити командою
                 <span class="font-mono text-xs">php artisan sites:run-scheduled</span>.
+                Не запускайте одночасно й cron <span class="font-mono text-xs">schedule:run</span>, і окремий виклик
+                <span class="font-mono text-xs">sites:run-scheduled</span> — буде подвійна перевірка.
             </p>
         </section>
     </div>
