@@ -8,9 +8,12 @@ use App\Models\Snapshot;
 use App\Services\CheckStats;
 use App\Services\DiffService;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class Show extends Component
 {
+    use WithPagination;
+
     public Site $site;
 
     public Address $address;
@@ -38,13 +41,28 @@ class Show extends Component
     public function render(DiffService $diffService, CheckStats $checkStats)
     {
         $this->address->setRelation('site', $this->site);
-        $this->address->load(['snapshots' => fn ($q) => $q->orderByDesc('id')]);
 
-        $snapshots = $this->address->snapshots;
-        $latest = $snapshots->first();
+        $latest = Snapshot::query()
+            ->where('address_id', $this->address->id)
+            ->orderByDesc('id')
+            ->first();
+
         $previous = $latest?->previous();
         $diff = $latest ? $diffService->compare($previous, $latest) : null;
-        $stats = $checkStats->forSnapshots($snapshots);
+        $stats = $checkStats->forAddress($this->address);
+
+        $snapshots = Snapshot::query()
+            ->where('address_id', $this->address->id)
+            ->orderByDesc('id')
+            ->select([
+                'id',
+                'address_id',
+                'status_code',
+                'response_time_ms',
+                'error_message',
+                'created_at',
+            ])
+            ->paginate(20);
 
         return view('livewire.addresses.show', [
             'snapshots' => $snapshots,

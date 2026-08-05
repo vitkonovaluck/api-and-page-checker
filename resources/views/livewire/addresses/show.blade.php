@@ -166,6 +166,12 @@
                     </tbody>
                 </table>
             </div>
+
+            @if ($snapshots->hasPages())
+                <div class="border-t border-slate-200 px-5 py-4">
+                    {{ $snapshots->links() }}
+                </div>
+            @endif
         @endif
     </section>
 </div>
