@@ -148,17 +148,15 @@ class CheckStatsTest extends TestCase
         ]);
         $this->createSnapshot($address, 120, null);
 
-        $this->get("/sites/{$site->id}?period=6h")
+        $this->get("/sites/{$site->id}")
             ->assertOk()
-            ->assertSee('Історія часу відповіді адрес')
-            ->assertSee('Період вибірки')
-            ->assertSee('site-response-time-chart')
-            ->assertSee('Середнє значення часу відповіді по всіх адресах');
+            ->assertSee('Графік')
+            ->assertSeeLivewire(\App\Livewire\Charts\ResponseTimeChartModal::class)
+            ->assertSee('site-response-time-chart');
 
-        $this->get("/sites/{$site->id}/addresses/{$address->id}?period=12h")
+        $this->get("/sites/{$site->id}/addresses/{$address->id}")
             ->assertOk()
-            ->assertSee('Історія часу відповіді')
-            ->assertSee('Час відповіді адреси за обраний період')
+            ->assertSee('Графік')
             ->assertSee('address-response-time-chart');
     }
 

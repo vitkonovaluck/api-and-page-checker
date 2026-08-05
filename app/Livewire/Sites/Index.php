@@ -1,14 +1,16 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Livewire\Sites;
 
 use App\Models\Site;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Title;
+use Livewire\Component;
 
-class SiteController extends Controller
+#[Title('Список сайтів — API Snapshot Checker')]
+class Index extends Component
 {
-    public function copy(Site $site): RedirectResponse
+    public function copy(Site $site): void
     {
         $site->load('addresses');
 
@@ -34,17 +36,26 @@ class SiteController extends Controller
             return $newSite;
         });
 
-        return redirect()
-            ->route('sites.show', $copy)
-            ->with('success', 'Сайт скопійовано.');
+        session()->flash('success', 'Сайт скопійовано.');
+        $this->redirect(route('sites.show', $copy), navigate: true);
     }
 
-    public function destroy(Site $site): RedirectResponse
+    public function delete(Site $site): void
     {
         $site->delete();
 
-        return redirect()
-            ->route('sites.index')
-            ->with('success', 'Сайт видалено.');
+        session()->flash('success', 'Сайт видалено.');
+        $this->redirect(route('sites.index'), navigate: true);
+    }
+
+    public function render()
+    {
+        $sites = Site::query()
+            ->withCount('addresses')
+            ->with(['addresses' => fn ($q) => $q->orderByDesc('last_checked_at')])
+            ->orderByDesc('updated_at')
+            ->get();
+
+        return view('livewire.sites.index', compact('sites'));
     }
 }

@@ -1,0 +1,238 @@
+<div>
+    <div class="mb-6">
+        <a href="{{ route('sites.index') }}" wire:navigate class="text-sm text-sky-700 hover:underline">← До списку сайтів</a>
+        <div class="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                <h1 class="text-2xl font-semibold text-slate-900">{{ $site->name }}</h1>
+                <p class="mt-1 break-all font-mono text-sm text-slate-600">{{ $site->base_url }}</p>
+                <p class="mt-1 text-sm text-slate-600">
+                    Адреси цього сайту ({{ $site->addresses->count() }})
+                    @if ($site->schedule_enabled)
+                        <span class="ml-2 text-emerald-700">
+                            · розклад: {{ \App\Models\Site::SCHEDULE_INTERVAL_LABELS[$site->schedule_interval] ?? $site->schedule_interval }}
+                        </span>
+                    @endif
+                </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button
+                    type="button"
+                    wire:click="$dispatch('open-site-settings')"
+                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                >
+                    @include('partials.icons.cog')
+                    Налаштування
+                </button>
+                <button
+                    type="button"
+                    wire:click="$dispatch('open-response-time-chart')"
+                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                >
+                    Графік
+                </button>
+                <button
+                    type="button"
+                    wire:click="$dispatch('open-create-address')"
+                    class="inline-flex rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                >
+                    Додати адресу
+                </button>
+                <button
+                    type="button"
+                    wire:click="copy"
+                    class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                >
+                    Копіювати сайт
+                </button>
+                <form method="POST" action="{{ route('sites.check', $site) }}">
+                    @csrf
+                    <button
+                        type="submit"
+                        class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        @disabled($site->addresses->isEmpty())
+                    >
+                        Перевірити всі адреси
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <livewire:sites.site-settings-modal :site="$site" :key="'site-settings-'.$site->id" />
+    <livewire:addresses.create-address-modal :site="$site" :key="'create-address-'.$site->id" />
+    <livewire:charts.response-time-chart-modal
+        mode="site"
+        :site-id="$site->id"
+        title="Історія часу відповіді адрес"
+        chart-id="site-response-time-chart"
+        :key="'chart-site-'.$site->id"
+    />
+
+    @if (($scheduleStats && $scheduleStats['checks_count'] > 0) || ($siteStats['checks_count'] ?? 0) > 0)
+        <section class="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 class="mb-1 text-base font-semibold text-slate-900">Середні показники перевірок</h2>
+            <p class="mb-4 text-sm text-slate-500">
+                Середньоарифметичні значення за історією знімків
+                @if ($site->schedule_enabled)
+                    (для розкладу — окремо по запусках)
+                @endif
+            </p>
+            <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                @if ($site->schedule_enabled && $scheduleStats && $scheduleStats['checks_count'] > 0)
+                    <div class="rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-3">
+                        <dt class="text-xs uppercase tracking-wide text-emerald-800/70">Сер. час (розклад)</dt>
+                        <dd class="mt-1 text-lg font-semibold text-emerald-900">
+                            {{ $scheduleStats['avg_response_time_ms'] !== null ? $scheduleStats['avg_response_time_ms'].' ms' : '—' }}
+                        </dd>
+                        <p class="mt-1 text-xs text-emerald-800/70">
+                            {{ $scheduleStats['checks_count'] }} перевірок у розкладі
+                        </p>
+                    </div>
+                    <div class="rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-3">
+                        <dt class="text-xs uppercase tracking-wide text-emerald-800/70">Сер. помилок / запуск</dt>
+                        <dd class="mt-1 text-lg font-semibold text-emerald-900">
+                            {{ $scheduleStats['avg_errors_per_run'] !== null ? $scheduleStats['avg_errors_per_run'] : '—' }}
+                        </dd>
+                        <p class="mt-1 text-xs text-emerald-800/70">
+                            {{ $scheduleStats['error_count'] }} помилок за {{ $scheduleStats['runs_count'] }} запусків
+                        </p>
+                    </div>
+                @endif
+                <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                    <dt class="text-xs uppercase tracking-wide text-slate-500">Сер. час (усі)</dt>
+                    <dd class="mt-1 text-lg font-semibold text-slate-900">
+                        {{ $siteStats['avg_response_time_ms'] !== null ? $siteStats['avg_response_time_ms'].' ms' : '—' }}
+                    </dd>
+                    <p class="mt-1 text-xs text-slate-500">
+                        {{ $siteStats['checks_count'] }} перевірок загалом
+                    </p>
+                </div>
+                <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                    <dt class="text-xs uppercase tracking-wide text-slate-500">Сер. помилок / перевірка</dt>
+                    <dd class="mt-1 text-lg font-semibold text-slate-900">
+                        {{ $siteStats['avg_errors'] !== null ? $siteStats['avg_errors'] : '—' }}
+                    </dd>
+                    <p class="mt-1 text-xs text-slate-500">
+                        {{ $siteStats['error_count'] }} помилок загалом
+                    </p>
+                </div>
+            </dl>
+        </section>
+    @endif
+
+    <section class="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-200 px-5 py-4 flex items-center justify-between gap-3">
+            <h2 class="text-base font-semibold text-slate-900">Адреси</h2>
+            <button
+                type="button"
+                wire:click="$dispatch('open-create-address')"
+                class="inline-flex rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
+            >
+                Додати адресу
+            </button>
+        </div>
+
+        @if ($site->addresses->isEmpty())
+            <p class="px-5 py-8 text-sm text-slate-500">Ще немає адрес. Додайте ендпоїнт кнопкою вище.</p>
+        @else
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                        <tr>
+                            <th class="px-5 py-3">Назва / ендпоїнт</th>
+                            <th class="px-5 py-3">Остання перевірка</th>
+                            <th class="px-5 py-3">Статус</th>
+                            <th class="px-5 py-3">Час відповіді</th>
+                            <th class="px-5 py-3">Сер. час</th>
+                            <th class="px-5 py-3">Сер. помилок</th>
+                            <th class="px-5 py-3 text-right">Дії</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach ($site->addresses as $address)
+                            @php
+                                $address->setRelation('site', $site);
+                                $latest = $address->latestSnapshot;
+                                $stats = $addressStats[$address->id] ?? ['checks_count' => 0, 'avg_response_time_ms' => null, 'error_count' => 0, 'avg_errors' => null];
+                            @endphp
+                            <tr class="align-top hover:bg-slate-50/80" wire:key="address-{{ $address->id }}">
+                                <td class="px-5 py-4">
+                                    <div class="font-medium text-slate-900">
+                                        {{ $address->name ?: 'Без назви' }}
+                                        @if ($address->schedule_enabled)
+                                            <span class="ml-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700">schedule</span>
+                                        @endif
+                                    </div>
+                                    <a href="{{ route('addresses.show', [$site, $address]) }}" wire:navigate class="mt-1 block break-all font-mono text-xs text-sky-700 hover:underline">
+                                        {{ $address->endpoint }}
+                                    </a>
+                                    <div class="mt-0.5 break-all font-mono text-[11px] text-slate-400">{{ $address->fullUrl() }}</div>
+                                </td>
+                                <td class="px-5 py-4 text-slate-600">
+                                    {{ $address->last_checked_at?->format('d.m.Y H:i:s') ?? 'ще не перевірялася' }}
+                                </td>
+                                <td class="px-5 py-4">
+                                    @if ($latest?->error_message)
+                                        <span class="rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">помилка</span>
+                                    @elseif ($latest)
+                                        <span class="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-800">{{ $latest->status_code }}</span>
+                                    @else
+                                        <span class="text-slate-400">—</span>
+                                    @endif
+                                </td>
+                                <td class="px-5 py-4 text-slate-700">
+                                    {{ $latest ? $latest->response_time_ms.' ms' : '—' }}
+                                </td>
+                                <td class="px-5 py-4 text-slate-700">
+                                    {{ $stats['avg_response_time_ms'] !== null ? $stats['avg_response_time_ms'].' ms' : '—' }}
+                                </td>
+                                <td class="px-5 py-4 text-slate-700">
+                                    @if ($stats['checks_count'] > 0)
+                                        <span title="Середня кількість помилок на перевірку">{{ $stats['avg_errors'] }}</span>
+                                        <span class="block text-xs text-slate-400">{{ $stats['error_count'] }} / {{ $stats['checks_count'] }}</span>
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                                <td class="px-5 py-4">
+                                    <div class="flex flex-wrap justify-end gap-1.5">
+                                        <form method="POST" action="{{ route('addresses.check', [$site, $address]) }}">
+                                            @csrf
+                                            <button
+                                                type="submit"
+                                                title="Перевірити"
+                                                aria-label="Перевірити"
+                                                class="inline-flex items-center justify-center rounded-lg bg-emerald-600 p-2 text-white hover:bg-emerald-500"
+                                            >
+                                                @include('partials.icons.refresh')
+                                            </button>
+                                        </form>
+                                        <a
+                                            href="{{ route('addresses.show', [$site, $address]) }}"
+                                            wire:navigate
+                                            title="Знімки"
+                                            aria-label="Знімки"
+                                            class="inline-flex items-center justify-center rounded-lg border border-slate-300 p-2 text-slate-700 hover:bg-slate-100"
+                                        >
+                                            @include('partials.icons.eye')
+                                        </a>
+                                        <button
+                                            type="button"
+                                            wire:click="deleteAddress({{ $address->id }})"
+                                            wire:confirm="Видалити адресу і всі її знімки?"
+                                            title="Видалити"
+                                            aria-label="Видалити"
+                                            class="inline-flex items-center justify-center rounded-lg border border-red-200 p-2 text-red-700 hover:bg-red-50"
+                                        >
+                                            @include('partials.icons.trash')
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </section>
+</div>
