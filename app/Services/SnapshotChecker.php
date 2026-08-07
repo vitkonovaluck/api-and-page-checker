@@ -28,6 +28,7 @@ class SnapshotChecker
             'body' => $result->body,
             'body_hash' => hash('sha256', $result->body),
             'response_time_ms' => $result->responseTimeMs,
+            'timing' => $result->timing,
             'error_message' => $result->errorMessage,
         ]);
 
