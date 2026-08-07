@@ -74,6 +74,9 @@
                         @error('schedule_interval') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
                 </div>
+                <p class="mt-3 text-xs text-slate-500">
+                    Запуски вирівнюються по годиннику (наприклад, кожні 15 хв — о :00, :15, :30, :45), щоб контролювати навантаження.
+                </p>
                 @if ($site->schedule_last_run_at)
                     <p class="mt-3 text-xs text-slate-500">
                         Останній запланований запуск: {{ $site->schedule_last_run_at->format('d.m.Y H:i:s') }}

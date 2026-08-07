@@ -1,4 +1,4 @@
-<div>
+<div @if ($show) wire:poll.10s="refreshChart" @endif>
     <dialog
         wire:ignore.self
         x-data
@@ -83,7 +83,7 @@
                             'period_label' => $this->chart['period_label'] ?? '',
                         ];
                     @endphp
-                    <script type="application/json" id="{{ $chartId }}-data" wire:key="chart-data-{{ $period }}-{{ $this->chart['points_count'] }}">
+                    <script type="application/json" id="{{ $chartId }}-data" wire:key="chart-data-{{ $period }}-{{ $this->chart['checks_count'] }}-{{ $this->chart['avg_response_time_ms'] }}-{{ implode('-', $this->chart['values'] ?? []) }}">
                         {!! json_encode($chartPayload, JSON_UNESCAPED_UNICODE) !!}
                     </script>
                 @endif
