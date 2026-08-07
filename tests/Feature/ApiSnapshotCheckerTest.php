@@ -12,6 +12,7 @@ use App\Models\Site;
 use App\Models\Snapshot;
 use App\Services\DiffService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -20,6 +21,12 @@ use Tests\TestCase;
 class ApiSnapshotCheckerTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
 
     public function test_index_shows_sites_page(): void
     {
@@ -309,6 +316,8 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_scheduled_command_checks_due_sites(): void
     {
+        Carbon::setTestNow(Carbon::parse('2026-08-07 10:15:00'));
+
         $site = Site::query()->create([
             'name' => 'Scheduled',
             'base_url' => 'https://api.example.com',
@@ -336,10 +345,14 @@ class ApiSnapshotCheckerTest extends TestCase
         $this->assertSame(1, $included->snapshots()->count());
         $this->assertSame(0, $excluded->snapshots()->count());
         $this->assertNotNull($site->fresh()->schedule_last_run_at);
+
+        Carbon::setTestNow();
     }
 
     public function test_scheduled_command_does_not_double_check_when_run_twice(): void
     {
+        Carbon::setTestNow(Carbon::parse('2026-08-07 10:15:00'));
+
         $site = Site::query()->create([
             'name' => 'Scheduled',
             'base_url' => 'https://api.example.com',
@@ -360,6 +373,39 @@ class ApiSnapshotCheckerTest extends TestCase
         Artisan::call('sites:run-scheduled');
 
         $this->assertSame(1, $address->snapshots()->count());
+
+        Carbon::setTestNow();
+    }
+
+    public function test_scheduled_command_waits_for_clock_aligned_slot(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-07 10:07:00'));
+
+        $site = Site::query()->create([
+            'name' => 'Aligned',
+            'base_url' => 'https://api.example.com',
+            'schedule_enabled' => true,
+            'schedule_interval' => '15m',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/aligned',
+            'schedule_enabled' => true,
+        ]);
+
+        Http::fake([
+            'https://api.example.com/aligned' => Http::response(['ok' => true], 200),
+        ]);
+
+        Artisan::call('sites:run-scheduled');
+        $this->assertSame(0, $address->snapshots()->count());
+        $this->assertNull($site->fresh()->schedule_last_run_at);
+
+        Carbon::setTestNow(Carbon::parse('2026-08-07 10:15:00'));
+        Artisan::call('sites:run-scheduled');
+        $this->assertSame(1, $address->snapshots()->count());
+
+        Carbon::setTestNow();
     }
 
     public function test_settings_page_is_available(): void

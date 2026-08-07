@@ -59,6 +59,11 @@ class Show extends Component
         $this->redirect(route('sites.show', $this->site), navigate: true);
     }
 
+    public function refreshData(): void
+    {
+        $this->site->refresh();
+    }
+
     public function render(CheckStats $checkStats)
     {
         $this->site->load(['addresses' => fn ($q) => $q->with('latestSnapshot')->orderBy('id')]);

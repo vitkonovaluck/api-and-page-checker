@@ -44,6 +44,7 @@ class ResponseTimeChartModal extends Component
     public function open(): void
     {
         $this->show = true;
+        unset($this->chart);
         $this->dispatch('chart-should-render');
     }
 
@@ -59,6 +60,17 @@ class ResponseTimeChartModal extends Component
         }
 
         $this->period = $period;
+        unset($this->chart);
+        $this->dispatch('chart-should-render');
+    }
+
+    public function refreshChart(): void
+    {
+        if (! $this->show) {
+            return;
+        }
+
+        unset($this->chart);
         $this->dispatch('chart-should-render');
     }
 
