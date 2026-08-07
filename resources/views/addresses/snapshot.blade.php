@@ -49,6 +49,7 @@
                     <dd class="font-mono text-xs">{{ $snapshot->body_hash }}</dd>
                 </div>
             </dl>
+            @include('partials.timing', ['timing' => $snapshot->timing])
             @if ($snapshot->error_message)
                 <p class="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">{{ $snapshot->error_message }}</p>
             @endif
@@ -83,7 +84,8 @@
                         <dd class="font-medium">{{ $previous->response_time_ms }} ms</dd>
                     </div>
                 </dl>
-                <h3 class="mb-2 text-sm font-semibold text-slate-800">Body</h3>
+                @include('partials.timing', ['timing' => $previous->timing])
+                <h3 class="mb-2 mt-4 text-sm font-semibold text-slate-800">Body</h3>
                 <pre class="max-h-96 overflow-auto rounded-lg border border-slate-200 bg-slate-950 p-4 text-xs text-slate-100"><code>{{ $previous->body }}</code></pre>
             @endif
         </section>
