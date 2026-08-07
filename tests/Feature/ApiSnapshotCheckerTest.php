@@ -192,7 +192,7 @@ class ApiSnapshotCheckerTest extends TestCase
         ]);
 
         Livewire::test(CreateAddressModal::class, ['site' => $site])
-            ->set('endpoint', '/secure')
+            ->set('endpoints', '/secure')
             ->set('name', 'Secure')
             ->set('schedule_enabled', true)
             ->set('headers', [
@@ -206,10 +206,76 @@ class ApiSnapshotCheckerTest extends TestCase
         $address = $site->addresses()->first();
         $this->assertNotNull($address);
         $this->assertSame('/secure', $address->endpoint);
+        $this->assertSame('GET', $address->http_method);
         $this->assertSame([
             'Authorization' => 'Bearer token-123',
             'X-Api-Key' => 'abc',
         ], $address->request_headers);
+    }
+
+    public function test_can_bulk_create_addresses_with_shared_method_headers_and_body(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+
+        Livewire::test(CreateAddressModal::class, ['site' => $site])
+            ->set('endpoints', "/users\n/orders\n\n/products")
+            ->set('name', 'Ignored for bulk')
+            ->set('http_method', 'POST')
+            ->set('request_body', '{"ok":true}')
+            ->set('headers', [
+                ['name' => 'Authorization', 'value' => 'Bearer shared'],
+            ])
+            ->call('save')
+            ->assertRedirect("/sites/{$site->id}")
+            ->assertSessionHas('success', 'Додано 3 адрес.');
+
+        $addresses = $site->addresses()->orderBy('endpoint')->get();
+        $this->assertCount(3, $addresses);
+        $this->assertSame(['/orders', '/products', '/users'], $addresses->pluck('endpoint')->all());
+
+        foreach ($addresses as $address) {
+            $this->assertNull($address->name);
+            $this->assertSame('POST', $address->http_method);
+            $this->assertSame('{"ok":true}', $address->request_body);
+            $this->assertSame(['Authorization' => 'Bearer shared'], $address->request_headers);
+        }
+    }
+
+    public function test_bulk_create_rejects_duplicate_endpoints_in_list(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+
+        Livewire::test(CreateAddressModal::class, ['site' => $site])
+            ->set('endpoints', "/users\n/users")
+            ->call('save')
+            ->assertHasErrors(['endpoints']);
+
+        $this->assertSame(0, $site->addresses()->count());
+    }
+
+    public function test_bulk_create_rejects_existing_endpoints(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/users',
+        ]);
+
+        Livewire::test(CreateAddressModal::class, ['site' => $site])
+            ->set('endpoints', "/users\n/orders")
+            ->call('save')
+            ->assertHasErrors(['endpoints']);
+
+        $this->assertSame(1, $site->addresses()->count());
     }
 
     public function test_can_update_address_request_headers(): void
@@ -236,6 +302,37 @@ class ApiSnapshotCheckerTest extends TestCase
             ['Authorization' => 'Bearer new'],
             $address->fresh()->request_headers,
         );
+    }
+
+    public function test_can_update_address_method_and_body(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/data',
+            'http_method' => 'GET',
+        ]);
+
+        Livewire::test(AddressSettingsModal::class, ['site' => $site, 'address' => $address])
+            ->set('http_method', 'PUT')
+            ->set('request_body', '{"name":"updated"}')
+            ->call('save')
+            ->assertRedirect("/sites/{$site->id}/addresses/{$address->id}");
+
+        $address->refresh();
+        $this->assertSame('PUT', $address->http_method);
+        $this->assertSame('{"name":"updated"}', $address->request_body);
+
+        Livewire::test(AddressSettingsModal::class, ['site' => $site, 'address' => $address])
+            ->set('http_method', 'GET')
+            ->call('save');
+
+        $address->refresh();
+        $this->assertSame('GET', $address->http_method);
+        $this->assertNull($address->request_body);
     }
 
     public function test_response_time_chart_modal_switches_period(): void
@@ -312,6 +409,41 @@ class ApiSnapshotCheckerTest extends TestCase
         });
 
         $this->assertSame(1, $address->snapshots()->count());
+    }
+
+    public function test_check_sends_post_with_request_body(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/items',
+            'http_method' => 'POST',
+            'request_body' => '{"title":"hello"}',
+            'request_headers' => [
+                'Authorization' => 'Bearer post-token',
+            ],
+        ]);
+
+        Http::fake([
+            'https://api.example.com/items' => Http::response(['id' => 1], 201),
+        ]);
+
+        $this->post("/sites/{$site->id}/addresses/{$address->id}/check")
+            ->assertRedirect("/sites/{$site->id}/addresses/{$address->id}");
+
+        Http::assertSent(function ($request) {
+            return $request->url() === 'https://api.example.com/items'
+                && $request->method() === 'POST'
+                && $request->body() === '{"title":"hello"}'
+                && $request->hasHeader('Authorization', 'Bearer post-token')
+                && $request->hasHeader('Content-Type', 'application/json');
+        });
+
+        $this->assertSame(1, $address->snapshots()->count());
+        $this->assertSame(201, $address->snapshots()->first()->status_code);
     }
 
     public function test_scheduled_command_checks_due_sites(): void
@@ -491,5 +623,71 @@ class ApiSnapshotCheckerTest extends TestCase
 
         $this->assertSame(0, $site->snapshots()->count());
         $this->assertSame(1, $otherSite->snapshots()->count());
+    }
+
+    public function test_site_show_highlights_changed_status_with_previous(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Status Change',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $changed = Address::query()->create([
+            'site_id' => $site->id,
+            'name' => 'Changed',
+            'endpoint' => '/changed',
+        ]);
+        $stable = Address::query()->create([
+            'site_id' => $site->id,
+            'name' => 'Stable',
+            'endpoint' => '/stable',
+        ]);
+
+        Snapshot::query()->create([
+            'address_id' => $changed->id,
+            'status_code' => 200,
+            'headers' => [],
+            'body' => '{}',
+            'body_hash' => hash('sha256', '{}'),
+            'response_time_ms' => 10,
+        ]);
+        Snapshot::query()->create([
+            'address_id' => $changed->id,
+            'status_code' => 500,
+            'headers' => [],
+            'body' => '{}',
+            'body_hash' => hash('sha256', '{}'),
+            'response_time_ms' => 20,
+        ]);
+
+        Snapshot::query()->create([
+            'address_id' => $stable->id,
+            'status_code' => 200,
+            'headers' => [],
+            'body' => '{}',
+            'body_hash' => hash('sha256', '{}'),
+            'response_time_ms' => 30,
+        ]);
+        Snapshot::query()->create([
+            'address_id' => $stable->id,
+            'status_code' => 200,
+            'headers' => [],
+            'body' => '{}',
+            'body_hash' => hash('sha256', '{}'),
+            'response_time_ms' => 12,
+        ]);
+
+        $changed->load(['latestSnapshot', 'previousSnapshot']);
+        $this->assertSame(500, $changed->latestSnapshot->status_code);
+        $this->assertSame(200, $changed->previousSnapshot->status_code);
+
+        Livewire::test(\App\Livewire\Sites\Show::class, ['site' => $site])
+            ->assertOk()
+            ->assertSeeHtml('bg-red-100 text-red-800')
+            ->assertSeeHtml('500')
+            ->assertSeeHtml('(200)')
+            ->assertSeeHtml('text-red-600')
+            ->assertSeeHtml('↑')
+            ->assertSeeHtml('text-emerald-600')
+            ->assertSeeHtml('↓');
     }
 }
