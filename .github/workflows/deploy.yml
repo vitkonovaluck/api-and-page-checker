@@ -33,32 +33,30 @@ jobs:
         if: success()
         env:
           ROCKET_CHAT_WEBHOOK_URL: ${{ secrets.ROCKET_CHAT_WEBHOOK_URL }}
-        run: |
-          curl -sS -X POST "$ROCKET_CHAT_WEBHOOK_URL" \
-            -H 'Content-Type: application/json' \
-            -d "$(jq -n \
-              --arg text "✅ *api-checker* deploy success
-• Branch: \`${{ github.ref_name }}\`
-• Commit: [\`${{ github.sha }}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
-• Author: ${{ github.actor }}
-• Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-              --arg alias "GitHub Actions" \
-              --arg emoji ":rocket:" \
-              '{text: $text, alias: $alias, emoji: $emoji}')"
+          MSG_TEXT: |
+            ✅ *api-checker* deploy success
+            • Branch: `${{ github.ref_name }}`
+            • Commit: `${{ github.sha }}`
+            • Author: ${{ github.actor }}
+            • Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: >
+          curl -sS -X POST "$ROCKET_CHAT_WEBHOOK_URL"
+          -H "Content-Type: application/json"
+          -d "$(jq -n --arg text "$MSG_TEXT" --arg alias "GitHub Actions" --arg emoji ":rocket:"
+          '{text: $text, alias: $alias, emoji: $emoji}')"
 
       - name: Notify Rocket.Chat (failure)
         if: failure()
         env:
           ROCKET_CHAT_WEBHOOK_URL: ${{ secrets.ROCKET_CHAT_WEBHOOK_URL }}
-        run: |
-          curl -sS -X POST "$ROCKET_CHAT_WEBHOOK_URL" \
-            -H 'Content-Type: application/json' \
-            -d "$(jq -n \
-              --arg text "❌ *api-checker* deploy failed
-• Branch: \`${{ github.ref_name }}\`
-• Commit: [\`${{ github.sha }}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
-• Author: ${{ github.actor }}
-• Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-              --arg alias "GitHub Actions" \
-              --arg emoji ":x:" \
-              '{text: $text, alias: $alias, emoji: $emoji}')"
+          MSG_TEXT: |
+            ❌ *api-checker* deploy failed
+            • Branch: `${{ github.ref_name }}`
+            • Commit: `${{ github.sha }}`
+            • Author: ${{ github.actor }}
+            • Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: >
+          curl -sS -X POST "$ROCKET_CHAT_WEBHOOK_URL"
+          -H "Content-Type: application/json"
+          -d "$(jq -n --arg text "$MSG_TEXT" --arg alias "GitHub Actions" --arg emoji ":x:"
+          '{text: $text, alias: $alias, emoji: $emoji}')"
