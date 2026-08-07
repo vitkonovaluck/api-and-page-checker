@@ -38,7 +38,6 @@ jobs:
             • Branch: `${{ github.ref_name }}`
             • Commit: `${{ github.sha }}`
             • Author: ${{ github.actor }}
-            • Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: >
           curl -sS -X POST "$ROCKET_CHAT_WEBHOOK_URL"
           -H "Content-Type: application/json"
@@ -54,7 +53,6 @@ jobs:
             • Branch: `${{ github.ref_name }}`
             • Commit: `${{ github.sha }}`
             • Author: ${{ github.actor }}
-            • Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: >
           curl -sS -X POST "$ROCKET_CHAT_WEBHOOK_URL"
           -H "Content-Type: application/json"
