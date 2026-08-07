@@ -85,6 +85,7 @@
                     <dd class="mt-1 font-medium">{{ $latest->response_time_ms }} ms</dd>
                 </div>
             </dl>
+            @include('partials.timing', ['timing' => $latest->timing])
             @if ($latest->error_message)
                 <p class="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">{{ $latest->error_message }}</p>
             @endif

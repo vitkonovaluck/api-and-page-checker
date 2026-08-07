@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'body',
     'body_hash',
     'response_time_ms',
+    'timing',
     'error_message',
 ])]
 class Snapshot extends Model
@@ -23,6 +24,7 @@ class Snapshot extends Model
     {
         return [
             'headers' => 'array',
+            'timing' => 'array',
             'status_code' => 'integer',
             'response_time_ms' => 'integer',
             'created_at' => 'datetime',
