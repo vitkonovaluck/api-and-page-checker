@@ -38,6 +38,12 @@ class Show extends Component
         $this->redirect(route('addresses.show', [$this->site, $this->address]), navigate: true);
     }
 
+    public function refreshData(): void
+    {
+        $this->site->refresh();
+        $this->address->refresh();
+    }
+
     public function render(DiffService $diffService, CheckStats $checkStats)
     {
         $this->address->setRelation('site', $this->site);

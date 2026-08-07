@@ -63,7 +63,8 @@
         <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
             <h2 class="mb-2 text-base font-semibold text-slate-900">Розклад перевірок</h2>
             <p class="text-sm text-slate-600">
-                На сервері додайте cron, щоб Laravel запускав розклад щохвилини:
+                На сервері додайте cron, щоб Laravel запускав розклад щохвилини.
+                Перевірки сайтів стартують у вирівняні моменти (5/15/30 хв, щогодини, тощо), а не через N хвилин після попереднього запуску:
             </p>
             <pre class="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-slate-950 p-4 text-xs text-slate-100"><code>* * * * * cd {{ base_path() }} &amp;&amp; php artisan schedule:run &gt;&gt; /dev/null 2&gt;&amp;1</code></pre>
             <p class="mt-3 text-sm text-slate-600">

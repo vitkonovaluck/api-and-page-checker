@@ -71,6 +71,48 @@ class Site extends Model
         return self::SCHEDULE_INTERVALS[$this->schedule_interval] ?? null;
     }
 
+    /**
+     * Start of the current clock-aligned schedule slot (e.g. :00/:15/:30/:45 for 15m).
+     */
+    public function currentScheduleSlotStart(?Carbon $now = null): ?Carbon
+    {
+        $minutes = $this->scheduleIntervalMinutes();
+        if ($minutes === null || $minutes < 1) {
+            return null;
+        }
+
+        $now ??= now();
+        $cursor = $now->copy()->second(0)->microsecond(0);
+
+        if ($minutes >= 1440) {
+            return $cursor->startOfDay();
+        }
+
+        if ($minutes >= 60 && $minutes % 60 === 0) {
+            $hours = intdiv($minutes, 60);
+            $alignedHour = intdiv($cursor->hour, $hours) * $hours;
+
+            return $cursor->copy()->startOfDay()->addHours($alignedHour);
+        }
+
+        $minutesFromMidnight = ($cursor->hour * 60) + $cursor->minute;
+        $alignedMinutes = intdiv($minutesFromMidnight, $minutes) * $minutes;
+
+        return $cursor->copy()->startOfDay()->addMinutes($alignedMinutes);
+    }
+
+    public function isAtScheduleSlotStart(?Carbon $now = null, ?Carbon $slotStart = null): bool
+    {
+        $now ??= now();
+        $slotStart ??= $this->currentScheduleSlotStart($now);
+
+        if ($slotStart === null) {
+            return false;
+        }
+
+        return $now->copy()->second(0)->microsecond(0)->equalTo($slotStart);
+    }
+
     public function isDueForScheduledCheck(?Carbon $now = null): bool
     {
         if (! $this->schedule_enabled) {
@@ -83,12 +125,18 @@ class Site extends Model
         }
 
         $now ??= now();
-
-        if ($this->schedule_last_run_at === null) {
-            return true;
+        $slotStart = $this->currentScheduleSlotStart($now);
+        if ($slotStart === null) {
+            return false;
         }
 
-        return $this->schedule_last_run_at->copy()->addMinutes($minutes)->lte($now);
+        // First run waits for a clock boundary so load stays aligned.
+        if ($this->schedule_last_run_at === null) {
+            return $this->isAtScheduleSlotStart($now, $slotStart);
+        }
+
+        // Due once we enter a new slot (including catch-up after downtime).
+        return $this->schedule_last_run_at->lt($slotStart);
     }
 
     /**
@@ -107,22 +155,26 @@ class Site extends Model
         }
 
         $now ??= now();
-        $claimedAt = $now->copy();
-
-        $query = static::query()
-            ->whereKey($this->id)
-            ->where('schedule_enabled', true);
-
-        if ($this->schedule_last_run_at === null) {
-            $affected = $query
-                ->whereNull('schedule_last_run_at')
-                ->update(['schedule_last_run_at' => $claimedAt]);
-        } else {
-            $dueAtOrBefore = $now->copy()->subMinutes($minutes);
-            $affected = $query
-                ->where('schedule_last_run_at', '<=', $dueAtOrBefore)
-                ->update(['schedule_last_run_at' => $claimedAt]);
+        $slotStart = $this->currentScheduleSlotStart($now);
+        if ($slotStart === null) {
+            return false;
         }
+
+        $claimedAt = $now->copy();
+        $atSlotStart = $this->isAtScheduleSlotStart($now, $slotStart);
+
+        $affected = static::query()
+            ->whereKey($this->id)
+            ->where('schedule_enabled', true)
+            ->where(function ($query) use ($slotStart, $atSlotStart) {
+                $query->where('schedule_last_run_at', '<', $slotStart);
+
+                // Never-run sites only claim on an aligned minute.
+                if ($atSlotStart) {
+                    $query->orWhereNull('schedule_last_run_at');
+                }
+            })
+            ->update(['schedule_last_run_at' => $claimedAt]);
 
         if ($affected > 0) {
             $this->forceFill(['schedule_last_run_at' => $claimedAt]);
