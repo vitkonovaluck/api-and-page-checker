@@ -8,7 +8,7 @@
         <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
             <div>
                 <h2 class="text-base font-semibold text-slate-900">Налаштування адреси</h2>
-                <p class="mt-0.5 text-sm text-slate-500">Header-параметри запиту</p>
+                <p class="mt-0.5 text-sm text-slate-500">Параметри запиту</p>
             </div>
             <button
                 type="button"
@@ -23,8 +23,24 @@
             </button>
         </div>
 
-        <div class="overflow-y-auto px-5 py-5">
-            @include('livewire.partials.headers-editor')
+        <div class="space-y-4 overflow-y-auto px-5 py-5">
+            <div>
+                <label for="address-settings-method" class="mb-1 block text-sm font-medium text-slate-700">Метод</label>
+                <select
+                    id="address-settings-method"
+                    wire:model.live="http_method"
+                    class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200 sm:max-w-xs"
+                >
+                    @foreach (\App\Models\Address::METHODS as $method)
+                        <option value="{{ $method }}">{{ $method }}</option>
+                    @endforeach
+                </select>
+                @error('http_method') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+            </div>
+            @include('livewire.partials.request-body-editor')
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                @include('livewire.partials.headers-editor')
+            </div>
         </div>
 
         <div class="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">

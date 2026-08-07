@@ -34,8 +34,10 @@ class Show extends Component
                 $newSite->addresses()->create([
                     'name' => $address->name,
                     'endpoint' => $address->endpoint,
+                    'http_method' => $address->http_method,
                     'schedule_enabled' => $address->schedule_enabled,
                     'request_headers' => $address->request_headers,
+                    'request_body' => $address->request_body,
                     'last_checked_at' => null,
                 ]);
             }
@@ -66,7 +68,7 @@ class Show extends Component
 
     public function render(CheckStats $checkStats)
     {
-        $this->site->load(['addresses' => fn ($q) => $q->with('latestSnapshot')->orderBy('id')]);
+        $this->site->load(['addresses' => fn ($q) => $q->with(['latestSnapshot', 'previousSnapshot'])->orderBy('id')]);
 
         $addressStats = $checkStats->forAddresses($this->site->addresses);
         $scheduleStats = $this->site->schedule_enabled

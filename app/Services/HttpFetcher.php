@@ -13,39 +13,53 @@ class HttpFetcher
     /**
      * @param  array<string, string>  $headers
      */
-    public function get(string $url, array $headers = []): FetchResult
+    public function request(string $method, string $url, array $headers = [], ?string $body = null): FetchResult
     {
+        $method = strtoupper($method);
         $started = hrtime(true);
         /** @var array<string, int>|null $timing */
         $timing = null;
 
         try {
-            $response = Http::timeout(30)
-                ->withHeaders(array_merge([
-                    'Accept' => 'application/json, text/plain, */*',
-                    'User-Agent' => 'API-Snapshot-Checker/1.0',
-                    'ngrok-skip-browser-warning' => 'true',
-                ], $headers))
+            $mergedHeaders = array_merge([
+                'Accept' => 'application/json, text/plain, */*',
+                'User-Agent' => 'API-Snapshot-Checker/1.0',
+                'ngrok-skip-browser-warning' => 'true',
+            ], $headers);
+
+            $hasBody = $body !== null && $body !== '';
+            if ($hasBody && ! $this->hasHeader($mergedHeaders, 'Content-Type')) {
+                $mergedHeaders['Content-Type'] = $this->guessContentType($body);
+            }
+
+            $pending = Http::timeout(30)
+                ->withHeaders($mergedHeaders)
                 ->withOptions([
                     'http_errors' => false,
                     'on_stats' => function (TransferStats $stats) use (&$timing): void {
                         $timing = $this->timingFromStats($stats);
                     },
-                ])
-                ->get($url);
+                ]);
+
+            $options = [];
+            if ($hasBody) {
+                $options['body'] = $body;
+            }
+
+            $response = $pending->send($method, $url, $options);
 
             $elapsedMs = (int) round((hrtime(true) - $started) / 1_000_000);
 
-            $headers = [];
+            $responseHeaders = [];
             foreach ($response->headers() as $name => $values) {
-                $headers[strtolower((string) $name)] = is_array($values)
+                $responseHeaders[strtolower((string) $name)] = is_array($values)
                     ? implode(', ', $values)
                     : (string) $values;
             }
 
             return new FetchResult(
                 statusCode: $response->status(),
-                headers: $headers,
+                headers: $responseHeaders,
                 body: $response->body(),
                 responseTimeMs: max(0, $elapsedMs),
                 timing: $timing,
@@ -62,6 +76,45 @@ class HttpFetcher
                 timing: $timing,
             );
         }
+    }
+
+    /**
+     * @deprecated Use request() instead.
+     *
+     * @param  array<string, string>  $headers
+     */
+    public function get(string $url, array $headers = []): FetchResult
+    {
+        return $this->request('GET', $url, $headers);
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     */
+    private function hasHeader(array $headers, string $name): bool
+    {
+        foreach (array_keys($headers) as $key) {
+            if (strcasecmp((string) $key, $name) === 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function guessContentType(string $body): string
+    {
+        $trimmed = ltrim($body);
+
+        if ($trimmed !== '' && (str_starts_with($trimmed, '{') || str_starts_with($trimmed, '['))) {
+            json_decode($trimmed);
+
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return 'application/json';
+            }
+        }
+
+        return 'text/plain';
     }
 
     /**

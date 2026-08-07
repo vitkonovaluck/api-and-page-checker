@@ -10,7 +10,10 @@
         <div class="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h1 class="text-2xl font-semibold text-slate-900">{{ $address->name ?: 'Без назви' }}</h1>
-                <p class="mt-1 break-all font-mono text-sm text-slate-600">{{ $address->endpoint }}</p>
+                <p class="mt-1 flex flex-wrap items-center gap-2 break-all font-mono text-sm text-slate-600">
+                    <span class="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700">{{ $address->http_method ?: 'GET' }}</span>
+                    <span>{{ $address->endpoint }}</span>
+                </p>
                 <p class="mt-1 break-all font-mono text-xs text-slate-400">{{ $address->fullUrl() }}</p>
                 <p class="mt-2 text-sm text-slate-500">
                     Остання перевірка:

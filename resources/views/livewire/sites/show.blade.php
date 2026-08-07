@@ -170,6 +170,11 @@
                             @php
                                 $address->setRelation('site', $site);
                                 $latest = $address->latestSnapshot;
+                                $previous = $address->previousSnapshot;
+                                $statusChanged = $latest && $previous && $previous->status_code !== $latest->status_code;
+                                $responseTimeDelta = ($latest && $previous)
+                                    ? $latest->response_time_ms - $previous->response_time_ms
+                                    : null;
                                 $stats = $addressStats[$address->id] ?? ['checks_count' => 0, 'avg_response_time_ms' => null, 'error_count' => 0, 'avg_errors' => null];
                             @endphp
                             <tr class="align-top hover:bg-slate-50/80" wire:key="address-{{ $address->id }}">
@@ -180,8 +185,9 @@
                                             <span class="ml-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700">schedule</span>
                                         @endif
                                     </div>
-                                    <a href="{{ route('addresses.show', [$site, $address]) }}" wire:navigate class="mt-1 block break-all font-mono text-xs text-sky-700 hover:underline">
-                                        {{ $address->endpoint }}
+                                    <a href="{{ route('addresses.show', [$site, $address]) }}" wire:navigate class="mt-1 flex flex-wrap items-center gap-1.5 break-all font-mono text-xs text-sky-700 hover:underline">
+                                        <span class="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700">{{ $address->http_method ?: 'GET' }}</span>
+                                        <span>{{ $address->endpoint }}</span>
                                     </a>
                                     <div class="mt-0.5 break-all font-mono text-[11px] text-slate-400">{{ $address->fullUrl() }}</div>
                                 </td>
@@ -190,15 +196,40 @@
                                 </td>
                                 <td class="px-5 py-4">
                                     @if ($latest?->error_message)
-                                        <span class="rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">помилка</span>
+                                        <span class="rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
+                                            помилка
+                                            @if ($statusChanged)
+                                                <span class="font-mono font-normal">({{ $previous->status_code ?? '—' }})</span>
+                                            @endif
+                                        </span>
                                     @elseif ($latest)
-                                        <span class="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-800">{{ $latest->status_code }}</span>
+                                        <span @class([
+                                            'rounded px-2 py-0.5 font-mono text-xs',
+                                            'bg-red-100 text-red-800' => $statusChanged,
+                                            'bg-slate-100 text-slate-800' => ! $statusChanged,
+                                        ])>
+                                            {{ $latest->status_code }}
+                                            @if ($statusChanged)
+                                                <span class="font-normal">({{ $previous->status_code ?? '—' }})</span>
+                                            @endif
+                                        </span>
                                     @else
                                         <span class="text-slate-400">—</span>
                                     @endif
                                 </td>
                                 <td class="px-5 py-4 text-slate-700">
-                                    {{ $latest ? $latest->response_time_ms.' ms' : '—' }}
+                                    @if ($latest)
+                                        <span class="inline-flex items-center gap-1">
+                                            {{ $latest->response_time_ms }} ms
+                                            @if ($responseTimeDelta !== null && $responseTimeDelta > 0)
+                                                <span class="text-red-600" title="Було {{ $previous->response_time_ms }} ms">↑</span>
+                                            @elseif ($responseTimeDelta !== null && $responseTimeDelta < 0)
+                                                <span class="text-emerald-600" title="Було {{ $previous->response_time_ms }} ms">↓</span>
+                                            @endif
+                                        </span>
+                                    @else
+                                        —
+                                    @endif
                                 </td>
                                 <td class="px-5 py-4 text-slate-700">
                                     {{ $stats['avg_response_time_ms'] !== null ? $stats['avg_response_time_ms'].' ms' : '—' }}
