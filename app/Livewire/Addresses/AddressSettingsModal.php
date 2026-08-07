@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Addresses;
 
+use App\Livewire\Concerns\HandlesHttpMethodAndBody;
 use App\Livewire\Concerns\NormalizesRequestHeaders;
 use App\Models\Address;
 use App\Models\Site;
@@ -10,6 +11,7 @@ use Livewire\Component;
 
 class AddressSettingsModal extends Component
 {
+    use HandlesHttpMethodAndBody;
     use NormalizesRequestHeaders;
 
     public Site $site;
@@ -27,14 +29,14 @@ class AddressSettingsModal extends Component
 
         $this->site = $site;
         $this->address = $address;
-        $this->headers = $this->headersToRows($address->request_headers);
+        $this->loadFromAddress();
     }
 
     #[On('open-address-settings')]
     public function open(): void
     {
         $this->address->refresh();
-        $this->headers = $this->headersToRows($this->address->request_headers);
+        $this->loadFromAddress();
         $this->resetValidation();
         $this->show = true;
     }
@@ -47,19 +49,28 @@ class AddressSettingsModal extends Component
 
     public function save(): void
     {
-        $validated = $this->validate([
+        $validated = $this->validate(array_merge([
             'headers' => ['nullable', 'array'],
             'headers.*.name' => ['nullable', 'string', 'max:255'],
             'headers.*.value' => ['nullable', 'string', 'max:2048'],
-        ]);
+        ], $this->methodAndBodyRules()));
 
         $this->address->update([
+            'http_method' => $validated['http_method'],
             'request_headers' => $this->normalizeRequestHeaders($validated['headers'] ?? []),
+            'request_body' => $this->resolvedRequestBody(),
         ]);
 
         $this->show = false;
         session()->flash('success', 'Налаштування адреси збережено.');
         $this->redirect(route('addresses.show', [$this->site, $this->address]), navigate: true);
+    }
+
+    private function loadFromAddress(): void
+    {
+        $this->http_method = strtoupper((string) ($this->address->http_method ?: 'GET'));
+        $this->request_body = (string) ($this->address->request_body ?? '');
+        $this->headers = $this->headersToRows($this->address->request_headers);
     }
 
     public function render()

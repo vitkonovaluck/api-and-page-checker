@@ -25,8 +25,10 @@ class SiteController extends Controller
                 $newSite->addresses()->create([
                     'name' => $address->name,
                     'endpoint' => $address->endpoint,
+                    'http_method' => $address->http_method,
                     'schedule_enabled' => $address->schedule_enabled,
                     'request_headers' => $address->request_headers,
+                    'request_body' => $address->request_body,
                     'last_checked_at' => null,
                 ]);
             }
