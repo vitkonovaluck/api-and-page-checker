@@ -16,7 +16,10 @@ class CheckAddressJob implements ShouldQueue
 
     public int $timeout = 60;
 
-    public function __construct(public Address $address) {}
+    public function __construct(
+        public Address $address,
+        public ?int $checkRunId = null,
+    ) {}
 
     /**
      * @return list<object>
@@ -29,7 +32,7 @@ class CheckAddressJob implements ShouldQueue
     public function handle(SnapshotChecker $checker): void
     {
         $this->address->loadMissing('site');
-        $checker->check($this->address);
+        $checker->check($this->address, $this->checkRunId);
 
         $delay = (int) config('checking.delay_seconds', 1);
         if ($delay > 0) {

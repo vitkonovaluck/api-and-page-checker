@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'address_id',
+    'check_run_id',
     'status_code',
     'headers',
     'body',
@@ -27,6 +28,7 @@ class Snapshot extends Model
             'timing' => 'array',
             'status_code' => 'integer',
             'response_time_ms' => 'integer',
+            'check_run_id' => 'integer',
             'created_at' => 'datetime',
         ];
     }
@@ -34,6 +36,11 @@ class Snapshot extends Model
     public function address(): BelongsTo
     {
         return $this->belongsTo(Address::class);
+    }
+
+    public function checkRun(): BelongsTo
+    {
+        return $this->belongsTo(CheckRun::class);
     }
 
     public function previous(): ?self

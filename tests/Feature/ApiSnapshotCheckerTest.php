@@ -554,6 +554,8 @@ class ApiSnapshotCheckerTest extends TestCase
         $this->assertSame(1, $included->snapshots()->count());
         $this->assertSame(0, $excluded->snapshots()->count());
         $this->assertNotNull($site->fresh()->schedule_last_run_at);
+        $this->assertDatabaseCount('check_runs', 1);
+        $this->assertNotNull($included->snapshots()->first()->check_run_id);
 
         Carbon::setTestNow();
     }
@@ -583,8 +585,11 @@ class ApiSnapshotCheckerTest extends TestCase
         Artisan::call('sites:run-scheduled');
 
         Queue::assertPushed(CheckAddressJob::class, 1);
-        Queue::assertPushed(CheckAddressJob::class, fn (CheckAddressJob $job) => $job->address->is($included));
+        Queue::assertPushed(CheckAddressJob::class, function (CheckAddressJob $job) use ($included) {
+            return $job->address->is($included) && $job->checkRunId !== null;
+        });
         $this->assertNotNull($site->fresh()->schedule_last_run_at);
+        $this->assertDatabaseCount('check_runs', 1);
 
         Carbon::setTestNow();
     }

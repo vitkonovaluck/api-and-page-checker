@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Jobs\CheckAddressJob;
+use App\Models\CheckRun;
 use App\Models\Site;
 use App\Services\CheckingGuard;
 use Illuminate\Console\Command;
@@ -38,8 +39,10 @@ class RunScheduledSiteChecks extends Command
 
             $ran++;
 
+            $run = CheckRun::start($site, CheckRun::SOURCE_SCHEDULE);
+
             foreach ($site->addresses as $address) {
-                CheckAddressJob::dispatch($address);
+                CheckAddressJob::dispatch($address, $run->id);
                 $queued++;
             }
 
