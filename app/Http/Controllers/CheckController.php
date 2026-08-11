@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Address;
+use App\Models\CheckRun;
 use App\Models\Site;
 use App\Services\CheckingGuard;
 use App\Services\SnapshotChecker;
@@ -19,7 +20,8 @@ class CheckController extends Controller
         abort_unless($address->site_id === $site->id, 404);
 
         $redirect = $guard->runManual(function () use ($site, $address, $checker) {
-            $result = $checker->check($address);
+            $run = CheckRun::start($site, CheckRun::SOURCE_MANUAL);
+            $result = $checker->check($address, $run->id);
             $diff = $result['diff'];
 
             $message = $diff['is_first']
@@ -48,12 +50,13 @@ class CheckController extends Controller
                     ->with('success', 'Немає адрес для перевірки.');
             }
 
+            $run = CheckRun::start($site, CheckRun::SOURCE_MANUAL);
             $checked = 0;
             $withChanges = 0;
             $withErrors = 0;
 
             foreach ($addresses as $address) {
-                $result = $checker->check($address);
+                $result = $checker->check($address, $run->id);
                 $checked++;
 
                 if ($result['snapshot']->error_message) {

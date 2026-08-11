@@ -55,6 +55,28 @@ class CheckAddressJobTest extends TestCase
         $this->assertInstanceOf(RateLimited::class, $middleware[0]);
     }
 
+    public function test_job_passes_check_run_id_to_snapshot_checker(): void
+    {
+        config(['checking.delay_seconds' => 0]);
+
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/health',
+        ]);
+
+        $checker = Mockery::mock(SnapshotChecker::class);
+        $checker->shouldReceive('check')->once()->with(
+            Mockery::on(fn (Address $a) => $a->is($address)),
+            42,
+        );
+
+        (new CheckAddressJob($address, 42))->handle($checker);
+    }
+
     public function test_job_respects_zero_delay_without_sleeping(): void
     {
         config(['checking.delay_seconds' => 0]);
@@ -69,9 +91,10 @@ class CheckAddressJobTest extends TestCase
         ]);
 
         $checker = Mockery::mock(SnapshotChecker::class);
-        $checker->shouldReceive('check')->once()->with(Mockery::on(
-            fn (Address $a) => $a->is($address)
-        ));
+        $checker->shouldReceive('check')->once()->with(
+            Mockery::on(fn (Address $a) => $a->is($address)),
+            null,
+        );
 
         $started = hrtime(true);
         (new CheckAddressJob($address))->handle($checker);

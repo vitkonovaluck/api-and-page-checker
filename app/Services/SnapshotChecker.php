@@ -15,7 +15,7 @@ class SnapshotChecker
     /**
      * @return array{snapshot: Snapshot, previous: ?Snapshot, diff: array}
      */
-    public function check(Address $address): array
+    public function check(Address $address, ?int $checkRunId = null): array
     {
         $previous = $address->snapshots()->orderByDesc('id')->first();
         $address->loadMissing('site');
@@ -28,6 +28,7 @@ class SnapshotChecker
 
         $snapshot = Snapshot::query()->create([
             'address_id' => $address->id,
+            'check_run_id' => $checkRunId,
             'status_code' => $result->statusCode,
             'headers' => $result->headers,
             'body' => $result->body,

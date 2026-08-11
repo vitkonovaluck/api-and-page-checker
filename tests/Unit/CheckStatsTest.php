@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Models\Address;
+use App\Models\CheckRun;
 use App\Models\Site;
 use App\Models\Snapshot;
 use App\Services\CheckStats;
@@ -215,14 +216,85 @@ class CheckStatsTest extends TestCase
             ->assertSee('Сер. час');
     }
 
+    public function test_long_running_check_counts_as_single_run_and_chart_point(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Long run',
+            'base_url' => 'https://api.example.com',
+            'schedule_enabled' => true,
+            'schedule_interval' => '15m',
+        ]);
+        $a1 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/one',
+            'schedule_enabled' => true,
+        ]);
+        $a2 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/two',
+            'schedule_enabled' => true,
+        ]);
+        $a3 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/three',
+            'schedule_enabled' => true,
+        ]);
+
+        $run = CheckRun::start($site, CheckRun::SOURCE_SCHEDULE);
+
+        // Same logical run spanning three different minutes
+        $this->createSnapshot($a1, 100, null, now()->subMinutes(12)->toDateTimeString(), $run->id);
+        $this->createSnapshot($a2, 200, 'fail', now()->subMinutes(11)->toDateTimeString(), $run->id);
+        $this->createSnapshot($a3, 300, null, now()->subMinutes(10)->toDateTimeString(), $run->id);
+
+        $stats = app(CheckStats::class)->forSite($site, scheduledOnly: true);
+        $this->assertSame(3, $stats['checks_count']);
+        $this->assertSame(1, $stats['runs_count']);
+        $this->assertSame(1.0, $stats['avg_errors_per_run']);
+        $this->assertSame(200, $stats['avg_response_time_per_run_ms']);
+
+        $chart = app(CheckStats::class)->responseTimeChartForSite($site, '6h');
+        $this->assertSame(1, $chart['points_count']);
+        $this->assertSame([200], $chart['values']);
+        $this->assertSame([3], $chart['counts']);
+    }
+
+    public function test_manual_run_is_excluded_from_schedule_run_count(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Mixed',
+            'base_url' => 'https://api.example.com',
+            'schedule_enabled' => true,
+            'schedule_interval' => '15m',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/data',
+            'schedule_enabled' => true,
+        ]);
+
+        $scheduleRun = CheckRun::start($site, CheckRun::SOURCE_SCHEDULE);
+        $manualRun = CheckRun::start($site, CheckRun::SOURCE_MANUAL);
+
+        $this->createSnapshot($address, 100, null, '2026-08-01 10:00:00', $scheduleRun->id);
+        $this->createSnapshot($address, 400, 'fail', '2026-08-01 10:10:00', $manualRun->id);
+
+        $stats = app(CheckStats::class)->forSite($site, scheduledOnly: true);
+        $this->assertSame(2, $stats['checks_count']);
+        $this->assertSame(1, $stats['runs_count']);
+        $this->assertSame(0.0, $stats['avg_errors_per_run']);
+    }
+
     private function createSnapshot(
         Address $address,
         int $responseTimeMs,
         ?string $errorMessage,
         ?string $createdAt = null,
+        ?int $checkRunId = null,
     ): Snapshot {
         $snapshot = Snapshot::query()->create([
             'address_id' => $address->id,
+            'check_run_id' => $checkRunId,
             'status_code' => $errorMessage ? null : 200,
             'headers' => [],
             'body' => '{}',
