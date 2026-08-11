@@ -5,6 +5,7 @@ namespace App\Livewire\Addresses;
 use App\Models\Address;
 use App\Models\Site;
 use App\Models\Snapshot;
+use App\Services\CheckingGuard;
 use App\Services\CheckStats;
 use App\Services\DiffService;
 use Livewire\Component;
@@ -18,12 +19,15 @@ class Show extends Component
 
     public Address $address;
 
-    public function mount(Site $site, Address $address): void
+    public bool $checksBusy = false;
+
+    public function mount(Site $site, Address $address, CheckingGuard $guard): void
     {
         abort_unless($address->site_id === $site->id, 404);
 
         $this->site = $site;
         $this->address = $address;
+        $this->checksBusy = $guard->isBusy();
     }
 
     public function deleteSnapshot(int $snapshotId): void
@@ -38,14 +42,16 @@ class Show extends Component
         $this->redirect(route('addresses.show', [$this->site, $this->address]), navigate: true);
     }
 
-    public function refreshData(): void
+    public function refreshData(CheckingGuard $guard): void
     {
         $this->site->refresh();
         $this->address->refresh();
+        $this->checksBusy = $guard->isBusy();
     }
 
-    public function render(DiffService $diffService, CheckStats $checkStats)
+    public function render(DiffService $diffService, CheckStats $checkStats, CheckingGuard $guard)
     {
+        $this->checksBusy = $guard->isBusy();
         $this->address->setRelation('site', $this->site);
 
         $latest = Snapshot::query()

@@ -1,4 +1,4 @@
-<div wire:poll.10s>
+<div wire:poll.3s="refreshData">
     <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
             <h1 class="text-2xl font-semibold text-slate-900">Список сайтів</h1>
@@ -55,28 +55,12 @@
                                 </td>
                                 <td class="px-5 py-4">
                                     <div class="flex flex-wrap justify-end gap-1.5">
-                                        <form
-                                            method="POST"
-                                            action="{{ route('sites.check', $site) }}"
-                                            x-data="{ checking: false }"
-                                            @submit="checking = true"
-                                        >
-                                            @csrf
-                                            <button
-                                                type="submit"
-                                                title="Перевірити сайт"
-                                                aria-label="Перевірити сайт"
-                                                class="inline-flex items-center justify-center rounded-lg bg-emerald-600 p-2 text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-                                                x-bind:disabled="checking || {{ $site->addresses_count === 0 ? 'true' : 'false' }}"
-                                            >
-                                                <span x-show="!checking">
-                                                    @include('partials.icons.refresh')
-                                                </span>
-                                                <span x-show="checking" x-cloak>
-                                                    @include('partials.icons.spinner')
-                                                </span>
-                                            </button>
-                                        </form>
+                                        <x-check-button
+                                            :action="route('sites.check', $site)"
+                                            :busy="$checksBusy"
+                                            :disabled="$site->addresses_count === 0"
+                                            title="Перевірити сайт"
+                                        />
                                         <a
                                             href="{{ route('sites.show', $site) }}"
                                             wire:navigate
