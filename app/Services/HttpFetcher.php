@@ -5,6 +5,7 @@ namespace App\Services;
 use GuzzleHttp\TransferStats;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -15,6 +16,8 @@ class HttpFetcher
      */
     public function request(string $method, string $url, array $headers = [], ?string $body = null): FetchResult
     {
+        $this->throttleHost($url);
+
         $method = strtoupper($method);
         $started = hrtime(true);
         /** @var array<string, int>|null $timing */
@@ -86,6 +89,41 @@ class HttpFetcher
     public function get(string $url, array $headers = []): FetchResult
     {
         return $this->request('GET', $url, $headers);
+    }
+
+    /**
+     * Space outbound checks so a single host stays within requests_per_minute.
+     */
+    private function throttleHost(string $url): void
+    {
+        $maxPerMinute = (int) config('checking.requests_per_minute', 32);
+
+        if ($maxPerMinute <= 0) {
+            return;
+        }
+
+        $host = parse_url($url, PHP_URL_HOST);
+        if (! is_string($host) || $host === '') {
+            $host = 'unknown';
+        }
+
+        $host = strtolower($host);
+        $key = 'http-fetcher:last-request:'.$host;
+        $minIntervalMs = (int) ceil(60_000 / $maxPerMinute);
+
+        $nowMs = (int) floor(microtime(true) * 1000);
+        $lastMs = Cache::get($key);
+
+        if ($lastMs !== null) {
+            $waitMs = $minIntervalMs - ($nowMs - (int) $lastMs);
+
+            if ($waitMs > 0) {
+                usleep($waitMs * 1000);
+                $nowMs = (int) floor(microtime(true) * 1000);
+            }
+        }
+
+        Cache::put($key, $nowMs, 120);
     }
 
     /**
