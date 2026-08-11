@@ -6,6 +6,7 @@ use App\Livewire\Concerns\HandlesHttpMethodAndBody;
 use App\Livewire\Concerns\NormalizesEndpoint;
 use App\Livewire\Concerns\NormalizesRequestHeaders;
 use App\Models\Site;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\On;
@@ -88,18 +89,28 @@ class CreateAddressModal extends Component
         $body = $this->resolvedRequestBody();
         $name = count($parsed) === 1 ? ($validated['name'] ?: null) : null;
 
-        DB::transaction(function () use ($parsed, $name, $headers, $body, $validated): void {
-            foreach ($parsed as $endpoint) {
-                $this->site->addresses()->create([
-                    'name' => $name,
-                    'endpoint' => $endpoint,
-                    'http_method' => $validated['http_method'],
-                    'schedule_enabled' => $this->schedule_enabled,
-                    'request_headers' => $headers,
-                    'request_body' => $body,
+        try {
+            DB::transaction(function () use ($parsed, $name, $headers, $body, $validated): void {
+                foreach ($parsed as $endpoint) {
+                    $this->site->addresses()->create([
+                        'name' => $name,
+                        'endpoint' => $endpoint,
+                        'http_method' => $validated['http_method'],
+                        'schedule_enabled' => $this->schedule_enabled,
+                        'request_headers' => $headers,
+                        'request_body' => $body,
+                    ]);
+                }
+            });
+        } catch (QueryException $e) {
+            if ($this->isUniqueConstraintViolation($e)) {
+                throw ValidationException::withMessages([
+                    'endpoints' => 'Один або кілька ендпоїнтів уже додано до цього сайту.',
                 ]);
             }
-        });
+
+            throw $e;
+        }
 
         $this->show = false;
         $count = count($parsed);
@@ -143,6 +154,21 @@ class CreateAddressModal extends Component
         }
 
         return $endpoints;
+    }
+
+    private function isUniqueConstraintViolation(QueryException $e): bool
+    {
+        $sqlState = $e->errorInfo[0] ?? null;
+
+        // SQLSTATE 23000 = integrity constraint violation (MySQL/SQLite/Postgres)
+        if ($sqlState === '23000' || $sqlState === '23505') {
+            return true;
+        }
+
+        $message = $e->getMessage();
+
+        return str_contains($message, 'UNIQUE constraint failed')
+            || str_contains($message, 'Duplicate entry');
     }
 
     public function render()
