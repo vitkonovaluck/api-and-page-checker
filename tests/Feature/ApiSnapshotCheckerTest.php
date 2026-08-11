@@ -2,19 +2,24 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\CheckAddressJob;
 use App\Livewire\Addresses\AddressSettingsModal;
 use App\Livewire\Addresses\CreateAddressModal;
 use App\Livewire\Charts\ResponseTimeChartModal;
 use App\Livewire\Sites\CreateSiteModal;
+use App\Livewire\Sites\Show;
 use App\Livewire\Sites\SiteSettingsModal;
 use App\Models\Address;
 use App\Models\Site;
 use App\Models\Snapshot;
+use App\Services\CheckingGuard;
 use App\Services\DiffService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -123,6 +128,57 @@ class ApiSnapshotCheckerTest extends TestCase
         $this->assertSame(1, $a2->snapshots()->count());
         $this->assertNotNull($a1->fresh()->last_checked_at);
         $this->assertNotNull($a2->fresh()->last_checked_at);
+    }
+
+    public function test_manual_check_is_blocked_while_another_check_is_running(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/data',
+        ]);
+
+        Cache::put(CheckingGuard::MANUAL_KEY, true, 60);
+
+        Http::fake([
+            'https://api.example.com/data' => Http::response(['ok' => true], 200),
+        ]);
+
+        $this->from(route('addresses.show', [$site, $address]))
+            ->post("/sites/{$site->id}/addresses/{$address->id}/check")
+            ->assertRedirect(route('addresses.show', [$site, $address]))
+            ->assertSessionHas('error');
+
+        $this->assertSame(0, $address->snapshots()->count());
+    }
+
+    public function test_scheduled_command_skips_when_manual_check_is_running(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-07 10:15:00'));
+        Cache::put(CheckingGuard::MANUAL_KEY, true, 60);
+        Queue::fake();
+
+        $site = Site::query()->create([
+            'name' => 'Scheduled',
+            'base_url' => 'https://api.example.com',
+            'schedule_enabled' => true,
+            'schedule_interval' => '5m',
+        ]);
+        Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/included',
+            'schedule_enabled' => true,
+        ]);
+
+        Artisan::call('sites:run-scheduled');
+
+        Queue::assertNothingPushed();
+        $this->assertNull($site->fresh()->schedule_last_run_at);
+
+        Carbon::setTestNow();
     }
 
     public function test_check_all_with_no_addresses_shows_message(): void
@@ -446,7 +502,7 @@ class ApiSnapshotCheckerTest extends TestCase
         $this->assertSame(201, $address->snapshots()->first()->status_code);
     }
 
-    public function test_scheduled_command_checks_due_sites(): void
+    public function test_scheduled_command_queues_due_sites(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-08-07 10:15:00'));
 
@@ -481,7 +537,38 @@ class ApiSnapshotCheckerTest extends TestCase
         Carbon::setTestNow();
     }
 
-    public function test_scheduled_command_does_not_double_check_when_run_twice(): void
+    public function test_scheduled_command_dispatches_check_jobs_to_queue(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-07 10:15:00'));
+        Queue::fake();
+
+        $site = Site::query()->create([
+            'name' => 'Queued',
+            'base_url' => 'https://api.example.com',
+            'schedule_enabled' => true,
+            'schedule_interval' => '5m',
+        ]);
+        $included = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/included',
+            'schedule_enabled' => true,
+        ]);
+        Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/excluded',
+            'schedule_enabled' => false,
+        ]);
+
+        Artisan::call('sites:run-scheduled');
+
+        Queue::assertPushed(CheckAddressJob::class, 1);
+        Queue::assertPushed(CheckAddressJob::class, fn (CheckAddressJob $job) => $job->address->is($included));
+        $this->assertNotNull($site->fresh()->schedule_last_run_at);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_scheduled_command_does_not_double_queue_when_run_twice(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-08-07 10:15:00'));
 
@@ -680,7 +767,7 @@ class ApiSnapshotCheckerTest extends TestCase
         $this->assertSame(500, $changed->latestSnapshot->status_code);
         $this->assertSame(200, $changed->previousSnapshot->status_code);
 
-        Livewire::test(\App\Livewire\Sites\Show::class, ['site' => $site])
+        Livewire::test(Show::class, ['site' => $site])
             ->assertOk()
             ->assertSeeHtml('bg-red-100 text-red-800')
             ->assertSeeHtml('500')

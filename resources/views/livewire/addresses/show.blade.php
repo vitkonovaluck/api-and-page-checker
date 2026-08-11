@@ -1,4 +1,4 @@
-<div wire:poll.10s="refreshData">
+<div wire:poll.3s="refreshData">
     <div class="mb-6">
         <nav class="mb-2 text-sm text-slate-500">
             <a href="{{ route('sites.index') }}" wire:navigate class="text-sky-700 hover:underline">Сайти</a>
@@ -36,24 +36,11 @@
                 >
                     Графік
                 </button>
-                <form
-                    method="POST"
-                    action="{{ route('addresses.check', [$site, $address]) }}"
-                    x-data="{ checking: false }"
-                    @submit="checking = true"
-                >
-                    @csrf
-                    <button
-                        type="submit"
-                        class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-                        x-bind:disabled="checking"
-                    >
-                        <span x-show="checking" x-cloak class="inline-flex">
-                            @include('partials.icons.spinner')
-                        </span>
-                        <span x-text="checking ? 'Перевірка…' : 'Зробити знімок'">Зробити знімок</span>
-                    </button>
-                </form>
+                <x-check-button
+                    :action="route('addresses.check', [$site, $address])"
+                    :busy="$checksBusy"
+                    label="Зробити знімок"
+                />
             </div>
         </div>
     </div>
