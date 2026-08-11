@@ -252,9 +252,11 @@ class ApiSnapshotCheckerTest extends TestCase
         ]);
 
         Livewire::test(CreateAddressModal::class, ['site' => $site])
+            ->call('open')
             ->set('endpoints', "/users\n/users")
             ->call('save')
-            ->assertHasErrors(['endpoints']);
+            ->assertHasErrors(['endpoints'])
+            ->assertSet('show', true);
 
         $this->assertSame(0, $site->addresses()->count());
     }
@@ -271,11 +273,30 @@ class ApiSnapshotCheckerTest extends TestCase
         ]);
 
         Livewire::test(CreateAddressModal::class, ['site' => $site])
+            ->call('open')
             ->set('endpoints', "/users\n/orders")
             ->call('save')
-            ->assertHasErrors(['endpoints']);
+            ->assertHasErrors(['endpoints'])
+            ->assertSet('show', true);
 
         $this->assertSame(1, $site->addresses()->count());
+    }
+
+    public function test_create_address_rejects_empty_endpoints_and_keeps_modal_open(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+
+        Livewire::test(CreateAddressModal::class, ['site' => $site])
+            ->call('open')
+            ->set('endpoints', "   \n\n  ")
+            ->call('save')
+            ->assertHasErrors(['endpoints'])
+            ->assertSet('show', true);
+
+        $this->assertSame(0, $site->addresses()->count());
     }
 
     public function test_can_update_address_request_headers(): void
