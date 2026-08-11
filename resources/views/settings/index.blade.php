@@ -63,15 +63,20 @@
         <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
             <h2 class="mb-2 text-base font-semibold text-slate-900">Розклад перевірок</h2>
             <p class="text-sm text-slate-600">
-                На сервері додайте cron, щоб Laravel запускав розклад щохвилини.
-                Перевірки сайтів стартують у вирівняні моменти (5/15/30 хв, щогодини, тощо), а не через N хвилин після попереднього запуску:
+                На сервері додайте cron, щоб Laravel щохвилини ставив due-адреси в чергу.
+                Старт — у вирівняні моменти (5/15/30 хв, щогодини тощо); сам HTTP-прогін виконує queue worker до останньої адреси:
             </p>
             <pre class="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-slate-950 p-4 text-xs text-slate-100"><code>* * * * * cd {{ base_path() }} &amp;&amp; php artisan schedule:run &gt;&gt; /dev/null 2&gt;&amp;1</code></pre>
             <p class="mt-3 text-sm text-slate-600">
-                Локально можна перевірити командою
-                <span class="font-mono text-xs">php artisan sites:run-scheduled</span>.
-                Не запускайте одночасно й cron <span class="font-mono text-xs">schedule:run</span>, і окремий виклик
-                <span class="font-mono text-xs">sites:run-scheduled</span> — буде подвійна перевірка.
+                Окремо тримайте воркер черги (один процес — щоб пауза ~1 с між перевірками давала ≈30/хв):
+            </p>
+            <pre class="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-slate-950 p-4 text-xs text-slate-100"><code>php artisan queue:work --tries=3 --timeout=60</code></pre>
+            <p class="mt-3 text-sm text-slate-600">
+                Локально: <span class="font-mono text-xs">composer run dev</span> уже запускає
+                <span class="font-mono text-xs">queue:listen</span>, або вручну
+                <span class="font-mono text-xs">php artisan sites:run-scheduled</span> (лише enqueue).
+                Не запускайте одночасно cron <span class="font-mono text-xs">schedule:run</span> і окремий
+                <span class="font-mono text-xs">sites:run-scheduled</span> — буде подвійна постановка в чергу.
             </p>
         </section>
     </div>

@@ -2,18 +2,25 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\CheckAddressJob;
 use App\Models\Site;
-use App\Services\SnapshotChecker;
+use App\Services\CheckingGuard;
 use Illuminate\Console\Command;
 
 class RunScheduledSiteChecks extends Command
 {
     protected $signature = 'sites:run-scheduled';
 
-    protected $description = 'Run due scheduled site address checks';
+    protected $description = 'Enqueue due scheduled site address checks';
 
-    public function handle(SnapshotChecker $checker): int
+    public function handle(CheckingGuard $guard): int
     {
+        if ($guard->isManualRunning()) {
+            $this->warn('Skipping scheduled enqueue: a manual check is in progress.');
+
+            return self::SUCCESS;
+        }
+
         $sites = Site::query()
             ->where('schedule_enabled', true)
             ->whereNotNull('schedule_interval')
@@ -21,7 +28,7 @@ class RunScheduledSiteChecks extends Command
             ->get();
 
         $ran = 0;
-        $checked = 0;
+        $queued = 0;
 
         foreach ($sites as $site) {
             // Claim first so a second concurrent scheduler process skips this site.
@@ -32,18 +39,17 @@ class RunScheduledSiteChecks extends Command
             $ran++;
 
             foreach ($site->addresses as $address) {
-                $address->setRelation('site', $site);
-                $checker->check($address);
-                $checked++;
+                CheckAddressJob::dispatch($address);
+                $queued++;
             }
 
-            $this->info("Site #{$site->id} ({$site->name}): checked {$site->addresses->count()} address(es).");
+            $this->info("Site #{$site->id} ({$site->name}): queued {$site->addresses->count()} address(es).");
         }
 
         if ($ran === 0) {
             $this->info('No sites due for scheduled check.');
         } else {
-            $this->info("Done. Sites: {$ran}, addresses checked: {$checked}.");
+            $this->info("Done. Sites: {$ran}, addresses queued: {$queued}.");
         }
 
         return self::SUCCESS;

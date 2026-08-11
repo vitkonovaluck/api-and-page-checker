@@ -1,0 +1,82 @@
+<?php
+
+namespace Tests\Unit;
+
+use App\Jobs\CheckAddressJob;
+use App\Models\Address;
+use App\Models\Site;
+use App\Services\SnapshotChecker;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Queue\Middleware\RateLimited;
+use Illuminate\Support\Facades\Http;
+use Mockery;
+use Tests\TestCase;
+
+class CheckAddressJobTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_job_runs_snapshot_checker_for_address(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/health',
+            'schedule_enabled' => true,
+        ]);
+
+        Http::fake([
+            'https://api.example.com/health' => Http::response(['ok' => true], 200),
+        ]);
+
+        (new CheckAddressJob($address))->handle(app(SnapshotChecker::class));
+
+        $this->assertSame(1, $address->snapshots()->count());
+        $this->assertNotNull($address->fresh()->last_checked_at);
+    }
+
+    public function test_job_uses_rate_limited_middleware(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/health',
+        ]);
+
+        $middleware = (new CheckAddressJob($address))->middleware();
+
+        $this->assertCount(1, $middleware);
+        $this->assertInstanceOf(RateLimited::class, $middleware[0]);
+    }
+
+    public function test_job_respects_zero_delay_without_sleeping(): void
+    {
+        config(['checking.delay_seconds' => 0]);
+
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/health',
+        ]);
+
+        $checker = Mockery::mock(SnapshotChecker::class);
+        $checker->shouldReceive('check')->once()->with(Mockery::on(
+            fn (Address $a) => $a->is($address)
+        ));
+
+        $started = hrtime(true);
+        (new CheckAddressJob($address))->handle($checker);
+        $elapsedMs = (hrtime(true) - $started) / 1_000_000;
+
+        $this->assertLessThan(500, $elapsedMs);
+    }
+}

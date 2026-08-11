@@ -4,6 +4,7 @@ namespace App\Livewire\Sites;
 
 use App\Models\Address;
 use App\Models\Site;
+use App\Services\CheckingGuard;
 use App\Services\CheckStats;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -12,9 +13,12 @@ class Show extends Component
 {
     public Site $site;
 
-    public function mount(Site $site): void
+    public bool $checksBusy = false;
+
+    public function mount(Site $site, CheckingGuard $guard): void
     {
         $this->site = $site;
+        $this->checksBusy = $guard->isBusy();
     }
 
     public function copy(): void
@@ -61,13 +65,15 @@ class Show extends Component
         $this->redirect(route('sites.show', $this->site), navigate: true);
     }
 
-    public function refreshData(): void
+    public function refreshData(CheckingGuard $guard): void
     {
         $this->site->refresh();
+        $this->checksBusy = $guard->isBusy();
     }
 
-    public function render(CheckStats $checkStats)
+    public function render(CheckStats $checkStats, CheckingGuard $guard)
     {
+        $this->checksBusy = $guard->isBusy();
         $this->site->load(['addresses' => fn ($q) => $q->with(['latestSnapshot', 'previousSnapshot'])->orderBy('id')]);
 
         $addressStats = $checkStats->forAddresses($this->site->addresses);
