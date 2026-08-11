@@ -148,6 +148,7 @@
                             <th class="px-5 py-3">Остання перевірка</th>
                             <th class="px-5 py-3">Статус</th>
                             <th class="px-5 py-3">Час відповіді</th>
+                            <th class="px-5 py-3">Body</th>
                             <th class="px-5 py-3">Сер. час</th>
                             <th class="px-5 py-3">Сер. помилок</th>
                             <th class="px-5 py-3 text-right">Дії</th>
@@ -162,6 +163,9 @@
                                 $statusChanged = $latest && $previous && $previous->status_code !== $latest->status_code;
                                 $responseTimeDelta = ($latest && $previous)
                                     ? $latest->response_time_ms - $previous->response_time_ms
+                                    : null;
+                                $bodyChanged = $latest && $previous
+                                    ? $latest->body_hash !== $previous->body_hash
                                     : null;
                                 $stats = $addressStats[$address->id] ?? ['checks_count' => 0, 'avg_response_time_ms' => null, 'error_count' => 0, 'avg_errors' => null];
                             @endphp
@@ -217,6 +221,19 @@
                                         </span>
                                     @else
                                         —
+                                    @endif
+                                </td>
+                                <td class="px-5 py-4">
+                                    @if ($bodyChanged === true)
+                                        <span class="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900" title="Body змінився порівняно з попереднім знімком">
+                                            змінено
+                                        </span>
+                                    @elseif ($bodyChanged === false)
+                                        <span class="rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800" title="Body збігається з попереднім знімком">
+                                            без змін
+                                        </span>
+                                    @else
+                                        <span class="text-slate-400">—</span>
                                     @endif
                                 </td>
                                 <td class="px-5 py-4 text-slate-700">
