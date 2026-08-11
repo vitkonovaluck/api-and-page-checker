@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\Address;
+use App\Models\CheckRun;
 use App\Models\Site;
 use App\Models\Snapshot;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -119,9 +121,22 @@ class CheckStats
 
         $base = $this->fromAggregateRow($row);
 
-        $runBuckets = Snapshot::query()
-            ->whereIn('address_id', $addressIds)
-            ->selectRaw($this->runBucketExpression().' as run_bucket')
+        $runBucketsQuery = Snapshot::query()
+            ->whereIn('address_id', $addressIds);
+
+        if ($scheduledOnly) {
+            $runBucketsQuery->where(function ($query) {
+                $query->whereNull('check_run_id')
+                    ->orWhereIn('check_run_id', function ($sub) {
+                        $sub->select('id')
+                            ->from('check_runs')
+                            ->where('source', CheckRun::SOURCE_SCHEDULE);
+                    });
+            });
+        }
+
+        $runBuckets = $runBucketsQuery
+            ->selectRaw($this->runGroupExpression().' as run_bucket')
             ->selectRaw('AVG(response_time_ms) as avg_response_time_ms')
             ->selectRaw('SUM(CASE WHEN error_message IS NOT NULL AND error_message != \'\' THEN 1 ELSE 0 END) as error_count')
             ->groupBy('run_bucket')
@@ -312,11 +327,12 @@ class CheckStats
             $rows = Snapshot::query()
                 ->whereIn('address_id', $addressIds)
                 ->where('created_at', '>=', $from)
-                ->selectRaw($this->runBucketExpression().' as bucket')
+                ->selectRaw($this->runGroupExpression().' as bucket')
+                ->selectRaw('MIN(created_at) as bucket_at')
                 ->selectRaw('AVG(response_time_ms) as avg_response_time_ms')
                 ->selectRaw('COUNT(*) as checks_count')
                 ->groupBy('bucket')
-                ->orderBy('bucket')
+                ->orderBy('bucket_at')
                 ->get();
 
             $labels = [];
@@ -328,7 +344,7 @@ class CheckStats
             foreach ($rows as $row) {
                 $avg = (int) round((float) $row->avg_response_time_ms);
                 $count = (int) $row->checks_count;
-                $labels[] = $this->formatBucketLabel((string) $row->bucket);
+                $labels[] = $this->formatBucketAtLabel($row->bucket_at);
                 $values[] = $avg;
                 $counts[] = $count;
                 $weightedSum += $avg * $count;
@@ -375,12 +391,12 @@ class CheckStats
         ];
     }
 
-    private function formatBucketLabel(string $bucket): string
+    private function formatBucketAtLabel(mixed $bucketAt): string
     {
         try {
-            return \Illuminate\Support\Carbon::createFromFormat('Y-m-d H:i', $bucket)->format('d.m H:i');
+            return Carbon::parse($bucketAt)->format('d.m H:i');
         } catch (\Throwable) {
-            return $bucket;
+            return (string) $bucketAt;
         }
     }
 
@@ -426,6 +442,22 @@ class CheckStats
             'error_count' => $errorCount,
             'avg_errors' => round($errorCount / $checksCount, 2),
         ];
+    }
+
+    /**
+     * Group snapshots by logical check run when present; otherwise by minute
+     * of created_at (legacy rows without check_run_id).
+     */
+    private function runGroupExpression(): string
+    {
+        $minuteBucket = $this->runBucketExpression();
+        $driver = DB::connection()->getDriverName();
+
+        return match ($driver) {
+            'sqlite' => "CASE WHEN check_run_id IS NOT NULL THEN 'run:' || check_run_id ELSE {$minuteBucket} END",
+            'pgsql' => "CASE WHEN check_run_id IS NOT NULL THEN 'run:' || check_run_id::text ELSE {$minuteBucket} END",
+            default => "CASE WHEN check_run_id IS NOT NULL THEN CONCAT('run:', check_run_id) ELSE {$minuteBucket} END",
+        };
     }
 
     private function runBucketExpression(): string

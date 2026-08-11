@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -48,12 +49,17 @@ class Site extends Model
         return $this->hasMany(Address::class);
     }
 
+    public function checkRuns(): HasMany
+    {
+        return $this->hasMany(CheckRun::class);
+    }
+
     public function snapshots(): HasManyThrough
     {
         return $this->hasManyThrough(Snapshot::class, Address::class);
     }
 
-    public function lastCheckedAt(): ?Carbon
+    public function lastCheckedAt(): ?CarbonInterface
     {
         $timestamp = $this->addresses()
             ->whereNotNull('last_checked_at')
@@ -74,7 +80,7 @@ class Site extends Model
     /**
      * Start of the current clock-aligned schedule slot (e.g. :00/:15/:30/:45 for 15m).
      */
-    public function currentScheduleSlotStart(?Carbon $now = null): ?Carbon
+    public function currentScheduleSlotStart(?CarbonInterface $now = null): ?CarbonInterface
     {
         $minutes = $this->scheduleIntervalMinutes();
         if ($minutes === null || $minutes < 1) {
@@ -101,7 +107,7 @@ class Site extends Model
         return $cursor->copy()->startOfDay()->addMinutes($alignedMinutes);
     }
 
-    public function isAtScheduleSlotStart(?Carbon $now = null, ?Carbon $slotStart = null): bool
+    public function isAtScheduleSlotStart(?CarbonInterface $now = null, ?CarbonInterface $slotStart = null): bool
     {
         $now ??= now();
         $slotStart ??= $this->currentScheduleSlotStart($now);
@@ -113,7 +119,7 @@ class Site extends Model
         return $now->copy()->second(0)->microsecond(0)->equalTo($slotStart);
     }
 
-    public function isDueForScheduledCheck(?Carbon $now = null): bool
+    public function isDueForScheduledCheck(?CarbonInterface $now = null): bool
     {
         if (! $this->schedule_enabled) {
             return false;
@@ -143,7 +149,7 @@ class Site extends Model
      * Atomically mark the site as started for this schedule tick.
      * Returns false if another process already claimed it (or it is not due).
      */
-    public function claimForScheduledCheck(?Carbon $now = null): bool
+    public function claimForScheduledCheck(?CarbonInterface $now = null): bool
     {
         if (! $this->schedule_enabled) {
             return false;
