@@ -16,8 +16,8 @@ class RunScheduledSiteChecks extends Command
 
     public function handle(CheckingGuard $guard): int
     {
-        if ($guard->isManualRunning()) {
-            $this->warn('Skipping scheduled enqueue: a manual check is in progress.');
+        if ($guard->isBusy()) {
+            $this->warn('Skipping scheduled enqueue: a check is already in progress.');
 
             return self::SUCCESS;
         }
