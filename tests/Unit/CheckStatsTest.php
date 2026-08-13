@@ -211,9 +211,46 @@ class CheckStatsTest extends TestCase
             ->assertSee('Середні показники перевірок')
             ->assertSee('Сер. час (розклад)')
             ->assertSee('Сер. помилок / запуск')
+            ->assertSee('Переглянути помилки')
+            ->assertSeeLivewire(\App\Livewire\Sites\ErrorSnapshotsModal::class)
             ->assertSee('Сер. час (остання)')
             ->assertSee('200 ms')
             ->assertSee('Сер. час');
+    }
+
+    public function test_error_snapshots_for_site_lists_schedule_errors_only(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Errors',
+            'base_url' => 'https://api.example.com',
+            'schedule_enabled' => true,
+            'schedule_interval' => '15m',
+        ]);
+        $scheduled = Address::query()->create([
+            'site_id' => $site->id,
+            'name' => 'Scheduled',
+            'endpoint' => '/scheduled',
+            'schedule_enabled' => true,
+        ]);
+        $manualOnly = Address::query()->create([
+            'site_id' => $site->id,
+            'name' => 'Manual',
+            'endpoint' => '/manual',
+            'schedule_enabled' => false,
+        ]);
+
+        $scheduleRun = CheckRun::start($site, CheckRun::SOURCE_SCHEDULE);
+        $manualRun = CheckRun::start($site, CheckRun::SOURCE_MANUAL);
+
+        $keep = $this->createSnapshot($scheduled, 100, 'schedule fail', '2026-08-01 10:00:00', $scheduleRun->id);
+        $this->createSnapshot($scheduled, 100, null, '2026-08-01 10:01:00', $scheduleRun->id);
+        $this->createSnapshot($scheduled, 100, 'manual fail', '2026-08-01 10:02:00', $manualRun->id);
+        $this->createSnapshot($manualOnly, 100, 'ignored', '2026-08-01 10:03:00', $scheduleRun->id);
+
+        $errors = app(CheckStats::class)->errorSnapshotsForSite($site, scheduledOnly: true)->get();
+
+        $this->assertCount(1, $errors);
+        $this->assertTrue($errors->contains('id', $keep->id));
     }
 
     public function test_long_running_check_counts_as_single_run_and_chart_point(): void
