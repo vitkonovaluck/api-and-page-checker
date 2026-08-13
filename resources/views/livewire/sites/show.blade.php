@@ -201,6 +201,20 @@
                                         <span>{{ $address->endpoint }}</span>
                                     </a>
                                     <div class="mt-0.5 break-all font-mono text-[11px] text-slate-400">{{ $address->fullUrl() }}</div>
+                                    @php
+                                        $headerCount = is_array($address->request_headers) ? count($address->request_headers) : 0;
+                                        $hasBody = filled($address->request_body);
+                                    @endphp
+                                    @if ($headerCount > 0 || $hasBody)
+                                        <div class="mt-1 flex flex-wrap gap-1.5 text-[11px] text-slate-500">
+                                            @if ($headerCount > 0)
+                                                <span class="rounded bg-slate-100 px-1.5 py-0.5">{{ $headerCount }} {{ $headerCount === 1 ? 'header' : 'headers' }}</span>
+                                            @endif
+                                            @if ($hasBody)
+                                                <span class="rounded bg-slate-100 px-1.5 py-0.5">body</span>
+                                            @endif
+                                        </div>
+                                    @endif
                                 </td>
                                 <td class="px-5 py-4 text-slate-600">
                                     {{ $address->last_checked_at?->format('d.m.Y H:i:s') ?? 'ще не перевірялася' }}

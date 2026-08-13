@@ -319,7 +319,7 @@ class ApiSnapshotCheckerTest extends TestCase
         $this->assertSame(0, $site->addresses()->count());
     }
 
-    public function test_bulk_create_rejects_existing_endpoints(): void
+    public function test_bulk_create_allows_existing_endpoints_with_different_request_options(): void
     {
         $site = Site::query()->create([
             'name' => 'Demo',
@@ -328,16 +328,30 @@ class ApiSnapshotCheckerTest extends TestCase
         Address::query()->create([
             'site_id' => $site->id,
             'endpoint' => '/users',
+            'http_method' => 'GET',
+            'request_headers' => ['Accept' => 'application/json'],
         ]);
 
         Livewire::test(CreateAddressModal::class, ['site' => $site])
             ->call('open')
-            ->set('endpoints', "/users\n/orders")
+            ->set('endpoints', '/users')
+            ->set('http_method', 'POST')
+            ->set('headers', [
+                ['name' => 'Authorization', 'value' => 'Bearer token'],
+            ])
+            ->set('request_body', '{"ok":true}')
             ->call('save')
-            ->assertHasErrors(['endpoints'])
-            ->assertSet('show', true);
+            ->assertHasNoErrors()
+            ->assertRedirect(route('sites.show', $site));
 
-        $this->assertSame(1, $site->addresses()->count());
+        $addresses = $site->addresses()->orderBy('id')->get();
+        $this->assertCount(2, $addresses);
+        $this->assertSame('/users', $addresses[0]->endpoint);
+        $this->assertSame('/users', $addresses[1]->endpoint);
+        $this->assertSame('GET', $addresses[0]->http_method);
+        $this->assertSame('POST', $addresses[1]->http_method);
+        $this->assertSame(['Authorization' => 'Bearer token'], $addresses[1]->request_headers);
+        $this->assertSame('{"ok":true}', $addresses[1]->request_body);
     }
 
     public function test_create_address_rejects_empty_endpoints_and_keeps_modal_open(): void
