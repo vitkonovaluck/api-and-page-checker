@@ -6,7 +6,9 @@ use App\Jobs\CheckAddressJob;
 use App\Livewire\Addresses\AddressSettingsModal;
 use App\Livewire\Addresses\CreateAddressModal;
 use App\Livewire\Charts\ResponseTimeChartModal;
+use App\Livewire\Sites\AddressListModal;
 use App\Livewire\Sites\CreateSiteModal;
+use App\Livewire\Sites\ErrorSnapshotsModal;
 use App\Livewire\Sites\Show;
 use App\Livewire\Sites\SiteSettingsModal;
 use App\Models\Address;
@@ -454,6 +456,72 @@ class ApiSnapshotCheckerTest extends TestCase
             ->assertSee('address-response-time-chart')
             ->call('setPeriod', '12h')
             ->assertSet('period', '12h');
+    }
+
+    public function test_error_snapshots_modal_lists_failed_schedule_requests(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+            'schedule_enabled' => true,
+            'schedule_interval' => '15m',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'name' => 'Users',
+            'endpoint' => '/users',
+            'schedule_enabled' => true,
+        ]);
+        Snapshot::query()->create([
+            'address_id' => $address->id,
+            'status_code' => null,
+            'headers' => [],
+            'body' => '',
+            'body_hash' => hash('sha256', ''),
+            'response_time_ms' => 12,
+            'error_message' => 'Connection timed out',
+        ]);
+
+        Livewire::test(ErrorSnapshotsModal::class, ['site' => $site])
+            ->call('open')
+            ->assertSet('show', true)
+            ->assertSee('Помилкові запити (розклад)')
+            ->assertSee('Connection timed out')
+            ->assertSee('Users')
+            ->assertSee('/users');
+    }
+
+    public function test_address_list_modal_lists_site_endpoints(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        Address::query()->create([
+            'site_id' => $site->id,
+            'name' => 'Car Service',
+            'endpoint' => '/api/car-service/type',
+            'http_method' => 'GET',
+        ]);
+        Address::query()->create([
+            'site_id' => $site->id,
+            'name' => 'Contact Form',
+            'endpoint' => '/api/contact/form/send',
+            'http_method' => 'POST',
+        ]);
+
+        $this->get("/sites/{$site->id}")
+            ->assertOk()
+            ->assertSee('Список адрес')
+            ->assertSeeLivewire(AddressListModal::class);
+
+        Livewire::test(AddressListModal::class, ['site' => $site])
+            ->call('open')
+            ->assertSet('show', true)
+            ->assertSee('Адреси для перевірки')
+            ->assertSee('GET /api/car-service/type')
+            ->assertSee('POST /api/contact/form/send')
+            ->assertDontSee('Car Service');
     }
 
     public function test_check_sends_custom_request_headers(): void

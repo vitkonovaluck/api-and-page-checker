@@ -6,6 +6,7 @@ use App\Models\Address;
 use App\Models\CheckRun;
 use App\Models\Site;
 use App\Models\Snapshot;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -172,6 +173,47 @@ class CheckStats
             'avg_latest_response_time_ms' => $avgLatestResponseTimeMs,
             'latest_checks_count' => $latestChecksCount,
         ]);
+    }
+
+    /**
+     * Snapshots with errors for a site. When $scheduledOnly is true, only
+     * schedule-enabled addresses and schedule (or legacy) runs are included —
+     * matching «Сер. помилок / запуск».
+     *
+     * @return Builder<Snapshot>
+     */
+    public function errorSnapshotsForSite(Site $site, bool $scheduledOnly = true): Builder
+    {
+        $addressQuery = $site->addresses();
+        if ($scheduledOnly) {
+            $addressQuery->where('schedule_enabled', true);
+        }
+
+        $addressIds = $addressQuery->pluck('id');
+
+        if ($addressIds->isEmpty()) {
+            return Snapshot::query()->whereRaw('0 = 1');
+        }
+
+        $query = Snapshot::query()
+            ->with(['address', 'checkRun'])
+            ->whereIn('address_id', $addressIds)
+            ->whereNotNull('error_message')
+            ->where('error_message', '!=', '')
+            ->orderByDesc('id');
+
+        if ($scheduledOnly) {
+            $query->where(function ($inner) {
+                $inner->whereNull('check_run_id')
+                    ->orWhereIn('check_run_id', function ($sub) {
+                        $sub->select('id')
+                            ->from('check_runs')
+                            ->where('source', CheckRun::SOURCE_SCHEDULE);
+                    });
+            });
+        }
+
+        return $query;
     }
 
     /**

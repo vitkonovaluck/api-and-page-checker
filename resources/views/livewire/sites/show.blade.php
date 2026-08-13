@@ -25,6 +25,13 @@
                 </button>
                 <button
                     type="button"
+                    wire:click="$dispatch('open-address-list')"
+                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                >
+                    Список адрес
+                </button>
+                <button
+                    type="button"
                     wire:click="$dispatch('open-response-time-chart')"
                     class="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
                 >
@@ -56,6 +63,8 @@
 
     <livewire:sites.site-settings-modal :site="$site" :key="'site-settings-'.$site->id" />
     <livewire:addresses.create-address-modal :site="$site" :key="'create-address-'.$site->id" />
+    <livewire:sites.address-list-modal :site="$site" :key="'address-list-'.$site->id" />
+    <livewire:sites.error-snapshots-modal :site="$site" :key="'error-snapshots-'.$site->id" />
     <livewire:charts.response-time-chart-modal
         mode="site"
         :site-id="$site->id"
@@ -92,6 +101,16 @@
                         <p class="mt-1 text-xs text-emerald-800/70">
                             {{ $scheduleStats['error_count'] }} помилок за {{ $scheduleStats['runs_count'] }} запусків
                         </p>
+                        @if (($scheduleStats['error_count'] ?? 0) > 0)
+                            <button
+                                type="button"
+                                wire:click="$dispatch('open-error-snapshots')"
+                                class="mt-2 inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-white/80 px-2.5 py-1 text-xs font-medium text-emerald-900 hover:bg-white"
+                            >
+                                @include('partials.icons.eye', ['class' => 'h-3.5 w-3.5'])
+                                Переглянути помилки
+                            </button>
+                        @endif
                     </div>
                 @endif
                 <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
