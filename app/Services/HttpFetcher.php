@@ -36,6 +36,7 @@ class HttpFetcher
             }
 
             $pending = Http::timeout(30)
+                ->connectTimeout(10)
                 ->withHeaders($mergedHeaders)
                 ->withOptions([
                     'http_errors' => false,
@@ -116,14 +117,30 @@ class HttpFetcher
 
         if ($lastMs !== null) {
             $waitMs = $minIntervalMs - ($nowMs - (int) $lastMs);
+            // A future/stale cache value must not sleep for minutes (PHP 120s cap).
+            $waitMs = min(max(0, $waitMs), $minIntervalMs);
 
             if ($waitMs > 0) {
-                usleep($waitMs * 1000);
+                $this->sleepMs($waitMs);
                 $nowMs = (int) floor(microtime(true) * 1000);
             }
         }
 
         Cache::put($key, $nowMs, 120);
+    }
+
+    private function sleepMs(int $waitMs): void
+    {
+        $seconds = intdiv($waitMs, 1000);
+        $micros = ($waitMs % 1000) * 1000;
+
+        if ($seconds > 0) {
+            sleep($seconds);
+        }
+
+        if ($micros > 0) {
+            usleep($micros);
+        }
     }
 
     /**
