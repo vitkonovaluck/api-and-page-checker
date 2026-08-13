@@ -132,6 +132,34 @@ class ApiSnapshotCheckerTest extends TestCase
         $this->assertNotNull($a2->fresh()->last_checked_at);
     }
 
+    public function test_check_all_dispatches_a_job_per_address(): void
+    {
+        Queue::fake();
+
+        $site = Site::query()->create([
+            'name' => 'Queued manual',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $a1 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/one',
+        ]);
+        Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/two',
+        ]);
+
+        $this->post("/sites/{$site->id}/check")
+            ->assertRedirect("/sites/{$site->id}")
+            ->assertSessionHas('success', 'Перевірку 2 адрес поставлено в чергу.');
+
+        Queue::assertPushed(CheckAddressJob::class, 2);
+        Queue::assertPushed(CheckAddressJob::class, function (CheckAddressJob $job) use ($a1) {
+            return $job->address->is($a1) && $job->checkRunId !== null;
+        });
+        $this->assertDatabaseCount('check_runs', 1);
+    }
+
     public function test_manual_check_is_blocked_while_another_check_is_running(): void
     {
         $site = Site::query()->create([

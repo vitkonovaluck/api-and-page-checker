@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\CheckAddressJob;
 use App\Models\Address;
 use App\Models\CheckRun;
 use App\Models\Site;
@@ -39,9 +40,9 @@ class CheckController extends Controller
         return $redirect ?? back()->with('error', 'Зараз уже виконується перевірка. Зачекайте завершення.');
     }
 
-    public function storeAll(Site $site, SnapshotChecker $checker, CheckingGuard $guard): RedirectResponse
+    public function storeAll(Site $site, CheckingGuard $guard): RedirectResponse
     {
-        $redirect = $guard->runManual(function () use ($site, $checker) {
+        $redirect = $guard->runManual(function () use ($site) {
             $addresses = $site->addresses()->orderBy('id')->get();
 
             if ($addresses->isEmpty()) {
@@ -51,29 +52,16 @@ class CheckController extends Controller
             }
 
             $run = CheckRun::start($site, CheckRun::SOURCE_MANUAL);
-            $checked = 0;
-            $withChanges = 0;
-            $withErrors = 0;
 
             foreach ($addresses as $address) {
-                $result = $checker->check($address, $run->id);
-                $checked++;
-
-                if ($result['snapshot']->error_message) {
-                    $withErrors++;
-                }
-
-                if (! empty($result['diff']['has_changes']) && empty($result['diff']['is_first'])) {
-                    $withChanges++;
-                }
+                CheckAddressJob::dispatch($address, $run->id);
             }
+
+            $checked = $addresses->count();
 
             return redirect()
                 ->route('sites.show', $site)
-                ->with(
-                    'success',
-                    "Перевірено {$checked} адрес: {$withChanges} зі змінами, {$withErrors} з помилками."
-                );
+                ->with('success', "Перевірку {$checked} адрес поставлено в чергу.");
         });
 
         return $redirect ?? back()->with('error', 'Зараз уже виконується перевірка. Зачекайте завершення.');
