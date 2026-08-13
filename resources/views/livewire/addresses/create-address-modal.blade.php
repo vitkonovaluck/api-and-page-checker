@@ -10,7 +10,7 @@
         <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
             <div>
                 <h2 class="text-base font-semibold text-slate-900">Додати адресу</h2>
-                <p class="mt-0.5 text-sm text-slate-500">Один або кілька ендпоїнтів (по одному на рядок) відносно базового URL</p>
+                <p class="mt-0.5 text-sm text-slate-500">Один або кілька ендпоїнтів (по одному на рядок). Той самий шлях можна додати знову з іншими headers/body</p>
             </div>
             <button
                 type="button"

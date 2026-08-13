@@ -144,7 +144,7 @@
         </section>
     @endif
 
-    <section class="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div class="border-b border-slate-200 px-5 py-4 flex items-center justify-between gap-3">
             <h2 class="text-base font-semibold text-slate-900">Адреси</h2>
             <button
@@ -159,18 +159,22 @@
         @if ($site->addresses->isEmpty())
             <p class="px-5 py-8 text-sm text-slate-500">Ще немає адрес. Додайте ендпоїнт кнопкою вище.</p>
         @else
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <div class="w-full max-w-full overflow-hidden">
+                <table class="w-full table-fixed divide-y divide-slate-200 text-sm">
                     <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                         <tr>
-                            <th class="px-5 py-3">Назва / ендпоїнт</th>
-                            <th class="px-5 py-3">Остання перевірка</th>
-                            <th class="px-5 py-3">Статус</th>
-                            <th class="px-5 py-3">Час відповіді</th>
-                            <th class="px-5 py-3">Body</th>
-                            <th class="px-5 py-3">Сер. час</th>
-                            <th class="px-5 py-3">Сер. помилок</th>
-                            <th class="px-5 py-3 text-right">Дії</th>
+                            <th class="w-10 px-3 py-2" title="Розклад">
+                                <span class="sr-only">Розклад</span>
+                                @include('partials.icons.clock', ['class' => 'h-3.5 w-3.5'])
+                            </th>
+                            <th class="px-3 py-2">Ендпоїнт</th>
+                            <th class="w-40 px-3 py-2">Остання перевірка</th>
+                            <th class="w-24 px-3 py-2">Статус</th>
+                            <th class="w-28 px-3 py-2">Час відповіді</th>
+                            <th class="w-24 px-3 py-2">Body</th>
+                            <th class="w-24 px-3 py-2">Сер. час</th>
+                            <th class="w-28 px-3 py-2">Сер. помилок</th>
+                            <th class="w-36 px-3 py-2 text-right">Дії</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -187,25 +191,35 @@
                                     ? $latest->body_hash !== $previous->body_hash
                                     : null;
                                 $stats = $addressStats[$address->id] ?? ['checks_count' => 0, 'avg_response_time_ms' => null, 'error_count' => 0, 'avg_errors' => null];
+                                $headerCount = is_array($address->request_headers) ? count($address->request_headers) : 0;
+                                $hasBody = filled($address->request_body);
                             @endphp
-                            <tr class="align-top hover:bg-slate-50/80" wire:key="address-{{ $address->id }}">
-                                <td class="px-5 py-4">
-                                    <div class="font-medium text-slate-900">
-                                        {{ $address->name ?: 'Без назви' }}
-                                        @if ($address->schedule_enabled)
-                                            <span class="ml-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700">schedule</span>
+                            <tr class="hover:bg-slate-50/80" wire:key="address-{{ $address->id }}">
+                                <td class="px-3 py-1.5 text-center">
+                                    @if ($address->schedule_enabled)
+                                        <span class="inline-flex text-emerald-700" title="У розкладі">
+                                            @include('partials.icons.clock', ['class' => 'h-4 w-4'])
+                                        </span>
+                                    @endif
+                                </td>
+                                <td class="min-w-0 overflow-hidden px-3 py-1.5">
+                                    <div class="flex min-w-0 items-center gap-1.5">
+                                        <a href="{{ route('addresses.show', [$site, $address]) }}" wire:navigate title="{{ $address->endpoint }}" class="inline-flex min-w-0 items-center gap-1.5 font-mono text-xs text-sky-700 hover:underline">
+                                            <span class="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700">{{ $address->http_method ?: 'GET' }}</span>
+                                            <span class="truncate">{{ $address->endpoint }}</span>
+                                        </a>
+                                        @if ($headerCount > 0)
+                                            <span class="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">{{ $headerCount }} {{ $headerCount === 1 ? 'header' : 'headers' }}</span>
+                                        @endif
+                                        @if ($hasBody)
+                                            <span class="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">body</span>
                                         @endif
                                     </div>
-                                    <a href="{{ route('addresses.show', [$site, $address]) }}" wire:navigate class="mt-1 flex flex-wrap items-center gap-1.5 break-all font-mono text-xs text-sky-700 hover:underline">
-                                        <span class="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700">{{ $address->http_method ?: 'GET' }}</span>
-                                        <span>{{ $address->endpoint }}</span>
-                                    </a>
-                                    <div class="mt-0.5 break-all font-mono text-[11px] text-slate-400">{{ $address->fullUrl() }}</div>
                                 </td>
-                                <td class="px-5 py-4 text-slate-600">
+                                <td class="truncate px-3 py-1.5 whitespace-nowrap text-slate-600">
                                     {{ $address->last_checked_at?->format('d.m.Y H:i:s') ?? 'ще не перевірялася' }}
                                 </td>
-                                <td class="px-5 py-4">
+                                <td class="px-3 py-1.5">
                                     @if ($latest?->error_message)
                                         <span class="rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
                                             помилка
@@ -228,7 +242,7 @@
                                         <span class="text-slate-400">—</span>
                                     @endif
                                 </td>
-                                <td class="px-5 py-4 text-slate-700">
+                                <td class="px-3 py-1.5 text-slate-700">
                                     @if ($latest)
                                         <span class="inline-flex items-center gap-1">
                                             {{ $latest->response_time_ms }} ms
@@ -242,7 +256,7 @@
                                         —
                                     @endif
                                 </td>
-                                <td class="px-5 py-4">
+                                <td class="px-3 py-1.5">
                                     @if ($bodyChanged === true)
                                         <span class="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900" title="Body змінився порівняно з попереднім знімком">
                                             змінено
@@ -255,19 +269,19 @@
                                         <span class="text-slate-400">—</span>
                                     @endif
                                 </td>
-                                <td class="px-5 py-4 text-slate-700">
+                                <td class="px-3 py-1.5 text-slate-700">
                                     {{ $stats['avg_response_time_ms'] !== null ? $stats['avg_response_time_ms'].' ms' : '—' }}
                                 </td>
-                                <td class="px-5 py-4 text-slate-700">
+                                <td class="px-3 py-1.5 text-slate-700">
                                     @if ($stats['checks_count'] > 0)
                                         <span title="Середня кількість помилок на перевірку">{{ $stats['avg_errors'] }}</span>
-                                        <span class="block text-xs text-slate-400">{{ $stats['error_count'] }} / {{ $stats['checks_count'] }}</span>
+                                        <span class="text-xs text-slate-400">{{ $stats['error_count'] }} / {{ $stats['checks_count'] }}</span>
                                     @else
                                         —
                                     @endif
                                 </td>
-                                <td class="px-5 py-4">
-                                    <div class="flex flex-wrap justify-end gap-1.5">
+                                <td class="px-3 py-1.5">
+                                    <div class="flex flex-nowrap justify-end gap-1.5">
                                         <x-check-button
                                             :action="route('addresses.check', [$site, $address])"
                                             :busy="$checksBusy"
