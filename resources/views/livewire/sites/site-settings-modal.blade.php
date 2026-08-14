@@ -1,53 +1,6 @@
 <dialog
-    wire:ignore.self
-    x-data="{
-        rpm: $wire.requestsPerMinute,
-        addressCount: {{ $site->addresses->count() }},
-        intervals: @js($scheduleIntervals),
-        safeRpm() {
-            return Math.max(1, Number(this.rpm) || 1)
-        },
-        intervalSeconds() {
-            return Math.round((60000 / this.safeRpm()) / 100) / 10
-        },
-        durationSeconds() {
-            if (this.addressCount < 1) {
-                return 0
-            }
-
-            return Math.ceil(this.addressCount * 60 / this.safeRpm())
-        },
-        durationLabel() {
-            const seconds = this.durationSeconds()
-            if (seconds < 1) {
-                return '—'
-            }
-            if (seconds < 60) {
-                return '≈ ' + seconds + ' с'
-            }
-            const minutes = Math.ceil(seconds / 60)
-            if (minutes < 60) {
-                return '≈ ' + minutes + ' хв'
-            }
-            const hours = Math.floor(minutes / 60)
-            const rest = minutes % 60
-
-            return rest === 0 ? '≈ ' + hours + ' год' : '≈ ' + hours + ' год ' + rest + ' хв'
-        },
-        mayOverlap() {
-            if (! $wire.schedule_enabled) {
-                return false
-            }
-            const minutes = this.intervals[$wire.schedule_interval] ?? null
-            if (! minutes) {
-                return false
-            }
-
-            return this.durationSeconds() > minutes * 60
-        }
-    }"
-    x-effect="$wire.show ? ($el.open || (rpm = $wire.requestsPerMinute, $el.showModal())) : ($el.open && $el.close())"
-    @close="$wire.close()"
+    x-data
+    x-effect="$wire.show ? $el.showModal() : ($el.open && $el.close())"
     @click="if ($event.target === $el) $wire.close()"
     class="w-[calc(100%-2rem)] max-w-2xl rounded-xl border border-slate-200 bg-white p-0 shadow-xl backdrop:bg-slate-900/40"
 >
@@ -129,23 +82,24 @@
                     <input
                         type="number"
                         id="requests_per_minute"
-                        wire:model="requestsPerMinute"
-                        @input="rpm = Number($el.value) || 1"
+                        wire:model.live.debounce.400ms="requests_per_minute"
                         min="1"
                         max="120"
                         required
                         class="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
                     >
-                    @error('requestsPerMinute') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    @error('requests_per_minute') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     <p class="mt-2 text-xs text-slate-500">
-                        Пауза між запитами: <span x-text="intervalSeconds()"></span> с.
-                        <span x-show="addressCount > 0">
-                            Повний прогін <span x-text="addressCount"></span> адрес: <span x-text="durationLabel()"></span>.
-                        </span>
+                        Пауза між запитами: {{ $checkIntervalSeconds }} с.
+                        @if ($site->addresses->isNotEmpty())
+                            Повний прогін {{ $site->addresses->count() }} адрес: {{ $estimatedDurationLabel }}.
+                        @endif
                     </p>
-                    <p class="mt-2 text-xs text-amber-700" x-show="mayOverlap()" x-cloak>
-                        Прогін довший за обраний період розкладу — наступний запуск пропустить сайт, поки йде поточна черга.
-                    </p>
+                    @if ($scheduleMayOverlap)
+                        <p class="mt-2 text-xs text-amber-700">
+                            Прогін довший за обраний період розкладу — наступний запуск пропустить сайт, поки йде поточна черга.
+                        </p>
+                    @endif
                 </div>
                 @if ($site->schedule_last_run_at)
                     <p class="mt-3 text-xs text-slate-500">
