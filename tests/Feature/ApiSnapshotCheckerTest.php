@@ -965,11 +965,26 @@ class ApiSnapshotCheckerTest extends TestCase
         ]);
 
         Livewire::test(SiteSettingsModal::class, ['site' => $site])
-            ->set('requests_per_minute', 12)
+            ->set('requestsPerMinute', 12)
             ->call('save')
             ->assertRedirect("/sites/{$site->id}");
 
         $this->assertSame(12, $site->fresh()->requests_per_minute);
+    }
+
+    public function test_updating_requests_per_minute_does_not_close_settings_modal(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+
+        Livewire::test(SiteSettingsModal::class, ['site' => $site])
+            ->call('open')
+            ->assertSet('show', true)
+            ->set('requestsPerMinute', 12)
+            ->assertSet('show', true)
+            ->assertSet('requestsPerMinute', 12);
     }
 
     public function test_site_show_highlights_changed_status_with_previous(): void
