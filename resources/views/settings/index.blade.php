@@ -11,20 +11,38 @@
     <div class="grid gap-6 lg:grid-cols-2">
         <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 class="mb-2 text-base font-semibold text-slate-900">Бекап бази даних</h2>
-            <p class="mb-4 text-sm text-slate-600">
-                Завантажити поточний файл SQLite
-                @if ($databaseExists)
-                    (<span class="font-mono text-xs">database/database.sqlite</span>).
-                @else
-                    (файл ще не створено).
-                @endif
-            </p>
+            @if ($is_mysql)
+                <p class="mb-4 text-sm text-slate-600">
+                    Завантажити SQL-дамп поточної бази MySQL
+                    @if ($database_name)
+                        <span class="font-mono text-xs">{{ $database_name }}</span>
+                    @endif
+                    @if ($database_host)
+                        ({{ $database_host }}{{ $database_port ? ':'.$database_port : '' }}).
+                    @else
+                        .
+                    @endif
+                </p>
+            @elseif ($is_sqlite)
+                <p class="mb-4 text-sm text-slate-600">
+                    Завантажити поточний файл SQLite
+                    @if ($sqlite_exists)
+                        (<span class="font-mono text-xs">{{ $sqlite_path }}</span>).
+                    @else
+                        (файл ще не створено).
+                    @endif
+                </p>
+            @else
+                <p class="mb-4 text-sm text-slate-600">
+                    Бекап для драйвера <span class="font-mono text-xs">{{ $driver }}</span> не підтримується.
+                </p>
+            @endif
             <form method="POST" action="{{ route('settings.backup') }}">
                 @csrf
                 <button
                     type="submit"
                     class="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                    @disabled(! $databaseExists)
+                    @disabled(! $can_backup)
                 >
                     Завантажити бекап
                 </button>
@@ -36,16 +54,21 @@
             <p class="mb-4 text-sm text-slate-600">
                 Перед заміною створюється копія поточної бази в
                 <span class="font-mono text-xs">storage/app/backups</span>.
+                @if ($is_mysql)
+                    Потрібен файл <span class="font-mono text-xs">.sql</span> (дамп MySQL).
+                @elseif ($is_sqlite)
+                    Потрібен файл <span class="font-mono text-xs">.sqlite</span> або <span class="font-mono text-xs">.db</span>.
+                @endif
             </p>
             <form method="POST" action="{{ route('settings.restore') }}" enctype="multipart/form-data" class="space-y-4">
                 @csrf
                 <div>
-                    <label for="database" class="mb-1 block text-sm font-medium text-slate-700">Файл .sqlite / .db</label>
+                    <label for="database" class="mb-1 block text-sm font-medium text-slate-700">Файл {{ $accepted_extensions }}</label>
                     <input
                         type="file"
                         name="database"
                         id="database"
-                        accept=".sqlite,.db"
+                        accept="{{ $accepted_accept }}"
                         required
                         class="block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-800"
                     >
@@ -54,6 +77,7 @@
                     type="submit"
                     class="inline-flex rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100"
                     onclick="return confirm('Замінити поточну базу даних цим файлом?')"
+                    @disabled(! $is_mysql && ! $is_sqlite)
                 >
                     Відновити базу
                 </button>
