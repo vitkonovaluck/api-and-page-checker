@@ -1,0 +1,136 @@
+# API Snapshot Checker — local Docker stack
+# UI: http://localhost:${APP_PORT:-8180}
+# MySQL (host): 127.0.0.1:${DB_PORT:-3307}
+#
+# Check a project from two addresses at once by creating two sites, e.g.:
+#   1) production  https://example.com
+#   2) local app   http://host.docker.internal:8000   (XAMPP / artisan serve on the host)
+#      or          http://<service-name>:<port>       (other compose project on network api-checker)
+x-php: &php
+  build:
+    context: .
+    dockerfile: docker/php/Dockerfile
+  env_file:
+    - .env
+  environment:
+    APP_ENV: local
+    APP_DEBUG: "true"
+    APP_URL: http://localhost:${APP_PORT:-8180}
+    DB_CONNECTION: mysql
+    DB_HOST: mysql
+    DB_PORT: "3306"
+    DB_DATABASE: ${DB_DATABASE:-api_checker}
+    DB_USERNAME: ${DB_USERNAME:-api_checker}
+    DB_PASSWORD: ${DB_PASSWORD:-secret}
+    CACHE_STORE: database
+    QUEUE_CONNECTION: database
+    SESSION_DRIVER: database
+  volumes:
+    - .:/var/www/html
+    - vendor:/var/www/html/vendor
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  networks:
+    - default
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: api-checker-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-api_checker}
+      MYSQL_USER: ${DB_USERNAME:-api_checker}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-secret}
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "${DB_PORT:-3307}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    networks:
+      - default
+
+  init:
+    <<: *php
+    container_name: api-checker-init
+    restart: "no"
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:${APP_PORT:-8180}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_DATABASE: ${DB_DATABASE:-api_checker}
+      DB_USERNAME: ${DB_USERNAME:-api_checker}
+      DB_PASSWORD: ${DB_PASSWORD:-secret}
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      SESSION_DRIVER: database
+      COMPOSER_INSTALL: "true"
+      RUN_MIGRATIONS: "true"
+    command: ["true"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  app:
+    <<: *php
+    container_name: api-checker-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      init:
+        condition: service_completed_successfully
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: api-checker-web
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8180}:80"
+    volumes:
+      - .:/var/www/html:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+    networks:
+      - default
+
+  queue:
+    <<: *php
+    container_name: api-checker-queue
+    restart: unless-stopped
+    command: ["php", "artisan", "queue:work", "--tries=3", "--timeout=90", "--sleep=1"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      init:
+        condition: service_completed_successfully
+
+  scheduler:
+    <<: *php
+    container_name: api-checker-scheduler
+    restart: unless-stopped
+    command: ["php", "artisan", "schedule:work"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      init:
+        condition: service_completed_successfully
+
+volumes:
+  vendor:
+  mysql_data:
+
+networks:
+  default:
+    name: api-checker
