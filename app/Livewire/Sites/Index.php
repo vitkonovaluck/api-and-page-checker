@@ -11,11 +11,12 @@ use Livewire\Component;
 #[Title('Список сайтів — API Snapshot Checker')]
 class Index extends Component
 {
-    public bool $checksBusy = false;
+    /** @var list<int> */
+    public array $busySiteIds = [];
 
     public function mount(CheckingGuard $guard): void
     {
-        $this->checksBusy = $guard->isBusy();
+        $this->busySiteIds = $guard->busySiteIds();
     }
 
     public function copy(Site $site): void
@@ -28,6 +29,7 @@ class Index extends Component
                 'base_url' => $site->base_url,
                 'schedule_enabled' => $site->schedule_enabled,
                 'schedule_interval' => $site->schedule_interval,
+                'requests_per_minute' => $site->requests_per_minute,
                 'schedule_last_run_at' => null,
             ]);
 
@@ -60,12 +62,12 @@ class Index extends Component
 
     public function refreshData(CheckingGuard $guard): void
     {
-        $this->checksBusy = $guard->isBusy();
+        $this->busySiteIds = $guard->busySiteIds();
     }
 
     public function render(CheckingGuard $guard)
     {
-        $this->checksBusy = $guard->isBusy();
+        $this->busySiteIds = $guard->busySiteIds();
 
         $sites = Site::query()
             ->withCount('addresses')

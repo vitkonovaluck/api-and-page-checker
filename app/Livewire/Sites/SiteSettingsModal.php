@@ -21,6 +21,8 @@ class SiteSettingsModal extends Component
 
     public ?string $schedule_interval = null;
 
+    public int $requests_per_minute = 30;
+
     /** @var list<int> */
     public array $address_schedule = [];
 
@@ -59,6 +61,7 @@ class SiteSettingsModal extends Component
             ],
             'address_schedule' => ['nullable', 'array'],
             'address_schedule.*' => ['integer'],
+            'requests_per_minute' => ['required', 'integer', 'min:1', 'max:120'],
         ]);
 
         $this->site->fill([
@@ -68,6 +71,7 @@ class SiteSettingsModal extends Component
             'schedule_interval' => $this->schedule_enabled
                 ? ($validated['schedule_interval'] ?? null)
                 : $this->site->schedule_interval,
+            'requests_per_minute' => (int) $validated['requests_per_minute'],
         ])->save();
 
         $enabledIds = collect($validated['address_schedule'] ?? [])
@@ -105,8 +109,15 @@ class SiteSettingsModal extends Component
     {
         $this->site->loadMissing(['addresses' => fn ($q) => $q->orderBy('id')]);
 
+        $preview = $this->previewSite();
+
         return view('livewire.sites.site-settings-modal', [
             'snapshotsCount' => $this->site->snapshots()->count(),
+            'checkIntervalSeconds' => round($preview->checkIntervalMilliseconds() / 1000, 1),
+            'estimatedDurationLabel' => $this->formatDuration(
+                $preview->estimatedCheckDurationSeconds($this->site->addresses->count())
+            ),
+            'scheduleMayOverlap' => $this->scheduleMayOverlap(),
         ]);
     }
 
@@ -116,11 +127,60 @@ class SiteSettingsModal extends Component
         $this->base_url = $this->site->base_url;
         $this->schedule_enabled = (bool) $this->site->schedule_enabled;
         $this->schedule_interval = $this->site->schedule_interval;
+        $this->requests_per_minute = $this->site->requestsPerMinute();
         $this->address_schedule = $this->site->addresses
             ->where('schedule_enabled', true)
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->values()
             ->all();
+    }
+
+    private function previewSite(): Site
+    {
+        return new Site([
+            'requests_per_minute' => max(1, $this->requests_per_minute),
+        ]);
+    }
+
+    private function scheduleMayOverlap(): bool
+    {
+        if (! $this->schedule_enabled) {
+            return false;
+        }
+
+        $minutes = Site::SCHEDULE_INTERVALS[$this->schedule_interval ?? ''] ?? null;
+        if ($minutes === null) {
+            return false;
+        }
+
+        $duration = $this->previewSite()->estimatedCheckDurationSeconds($this->site->addresses->count());
+
+        return $duration > ($minutes * 60);
+    }
+
+    private function formatDuration(int $seconds): string
+    {
+        if ($seconds < 1) {
+            return '—';
+        }
+
+        if ($seconds < 60) {
+            return "≈ {$seconds} с";
+        }
+
+        $minutes = (int) ceil($seconds / 60);
+        if ($minutes < 60) {
+            return "≈ {$minutes} хв";
+        }
+
+        $hours = intdiv($minutes, 60);
+        $rest = $minutes % 60;
+
+        if ($rest === 0) {
+            return "≈ {$hours} год";
+        }
+
+        return "≈ {$hours} год {$rest} хв";
     }
 }
