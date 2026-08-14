@@ -38,8 +38,8 @@ return [
             'database' => env('DB_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            'busy_timeout' => null,
-            'journal_mode' => null,
+            'busy_timeout' => env('DB_BUSY_TIMEOUT') ? (int) env('DB_BUSY_TIMEOUT') : null,
+            'journal_mode' => env('DB_JOURNAL_MODE'),
             'synchronous' => null,
             'transaction_mode' => 'DEFERRED',
         ],
@@ -130,6 +130,22 @@ return [
     'migrations' => [
         'table' => 'migrations',
         'update_date_on_publish' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | MySQL dump / restore client binaries
+    |--------------------------------------------------------------------------
+    |
+    | Optional absolute paths when mysqldump / mysql are not on PATH
+    | (typical for XAMPP on Windows). If empty, the app looks in common
+    | XAMPP locations and falls back to a PHP dump/import.
+    |
+    */
+
+    'dump' => [
+        'mysqldump_path' => env('MYSQLDUMP_PATH'),
+        'mysql_path' => env('MYSQL_CLIENT_PATH'),
     ],
 
     /*
