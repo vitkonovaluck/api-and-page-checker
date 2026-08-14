@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Console\Commands;
 
 use App\Jobs\CheckAddressJob;
@@ -18,6 +16,12 @@ class RunScheduledSiteChecks extends Command
 
     public function handle(CheckingGuard $guard): int
     {
+        if ($guard->isBusy()) {
+            $this->warn('Skipping scheduled enqueue: a check is already in progress.');
+
+            return self::SUCCESS;
+        }
+
         $sites = Site::query()
             ->where('schedule_enabled', true)
             ->whereNotNull('schedule_interval')
@@ -26,16 +30,8 @@ class RunScheduledSiteChecks extends Command
 
         $ran = 0;
         $queued = 0;
-        $skipped = 0;
 
         foreach ($sites as $site) {
-            if ($guard->isBusy($site->id)) {
-                $skipped++;
-                $this->warn("Skipping site #{$site->id} ({$site->name}): a check is already in progress.");
-
-                continue;
-            }
-
             // Claim first so a second concurrent scheduler process skips this site.
             if (! $site->claimForScheduledCheck()) {
                 continue;
@@ -45,15 +41,18 @@ class RunScheduledSiteChecks extends Command
 
             $run = CheckRun::start($site, CheckRun::SOURCE_SCHEDULE);
 
-            $queued += CheckAddressJob::dispatchForSite($site, $site->addresses, $run->id);
+            foreach ($site->addresses as $address) {
+                CheckAddressJob::dispatch($address, $run->id);
+                $queued++;
+            }
 
-            $this->info("Site #{$site->id} ({$site->name}): queued {$site->addresses->count()} address(es) on ".CheckAddressJob::queueNameForSite($site->id).'.');
+            $this->info("Site #{$site->id} ({$site->name}): queued {$site->addresses->count()} address(es).");
         }
 
-        if ($ran === 0 && $skipped === 0) {
+        if ($ran === 0) {
             $this->info('No sites due for scheduled check.');
         } else {
-            $this->info("Done. Sites: {$ran}, skipped busy: {$skipped}, addresses queued: {$queued}.");
+            $this->info("Done. Sites: {$ran}, addresses queued: {$queued}.");
         }
 
         return self::SUCCESS;

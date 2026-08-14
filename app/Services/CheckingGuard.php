@@ -1,62 +1,32 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Services;
 
-use App\Jobs\CheckAddressJob;
-use App\Models\Site;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class CheckingGuard
 {
-    public const MANUAL_KEY_PREFIX = 'checks:manual:';
+    public const MANUAL_KEY = 'checks:manual';
 
-    public static function manualCacheKey(int $siteId): string
+    public function isBusy(): bool
     {
-        return self::MANUAL_KEY_PREFIX.$siteId;
+        return Cache::has(self::MANUAL_KEY) || $this->hasPendingCheckJobs();
     }
 
-    public function isBusy(int $siteId): bool
+    public function tryStartManual(int $ttlSeconds = 3600): bool
     {
-        return Cache::has(self::manualCacheKey($siteId)) || $this->hasPendingCheckJobs($siteId);
-    }
-
-    /**
-     * @return list<int>
-     */
-    public function busySiteIds(): array
-    {
-        $ids = [];
-
-        foreach ($this->pendingJobSiteIds() as $siteId) {
-            $ids[$siteId] = $siteId;
-        }
-
-        foreach (Site::query()->pluck('id') as $siteId) {
-            $siteId = (int) $siteId;
-            if (Cache::has(self::manualCacheKey($siteId))) {
-                $ids[$siteId] = $siteId;
-            }
-        }
-
-        return array_values($ids);
-    }
-
-    public function tryStartManual(int $siteId, int $ttlSeconds = 3600): bool
-    {
-        if ($this->hasPendingCheckJobs($siteId)) {
+        if ($this->hasPendingCheckJobs()) {
             return false;
         }
 
-        return Cache::add(self::manualCacheKey($siteId), true, $ttlSeconds);
+        return Cache::add(self::MANUAL_KEY, true, $ttlSeconds);
     }
 
-    public function endManual(int $siteId): void
+    public function endManual(): void
     {
-        Cache::forget(self::manualCacheKey($siteId));
+        Cache::forget(self::MANUAL_KEY);
     }
 
     /**
@@ -65,25 +35,25 @@ class CheckingGuard
      * @param  callable(): T  $callback
      * @return T|null
      */
-    public function runManual(int $siteId, callable $callback): mixed
+    public function runManual(callable $callback): mixed
     {
-        if (! $this->tryStartManual($siteId)) {
+        if (! $this->tryStartManual()) {
             return null;
         }
 
         try {
             return $callback();
         } finally {
-            $this->endManual($siteId);
+            $this->endManual();
         }
     }
 
-    public function isManualRunning(int $siteId): bool
+    public function isManualRunning(): bool
     {
-        return Cache::has(self::manualCacheKey($siteId));
+        return Cache::has(self::MANUAL_KEY);
     }
 
-    public function hasPendingCheckJobs(int $siteId): bool
+    public function hasPendingCheckJobs(): bool
     {
         if (config('queue.default') === 'sync') {
             return false;
@@ -94,32 +64,7 @@ class CheckingGuard
         }
 
         return DB::table('jobs')
-            ->where('queue', CheckAddressJob::queueNameForSite($siteId))
+            ->where('payload', 'like', '%CheckAddressJob%')
             ->exists();
-    }
-
-    /**
-     * @return list<int>
-     */
-    private function pendingJobSiteIds(): array
-    {
-        if (config('queue.default') === 'sync') {
-            return [];
-        }
-
-        if (! Schema::hasTable('jobs')) {
-            return [];
-        }
-
-        $ids = [];
-
-        foreach (DB::table('jobs')->distinct()->pluck('queue') as $queue) {
-            $siteId = CheckAddressJob::siteIdFromQueueName((string) $queue);
-            if ($siteId !== null) {
-                $ids[] = $siteId;
-            }
-        }
-
-        return $ids;
     }
 }

@@ -27,7 +27,7 @@ class Show extends Component
 
         $this->site = $site;
         $this->address = $address;
-        $this->checksBusy = $guard->isBusy($site->id);
+        $this->checksBusy = $guard->isBusy();
     }
 
     public function deleteSnapshot(int $snapshotId): void
@@ -46,12 +46,12 @@ class Show extends Component
     {
         $this->site->refresh();
         $this->address->refresh();
-        $this->checksBusy = $guard->isBusy($this->site->id);
+        $this->checksBusy = $guard->isBusy();
     }
 
     public function render(DiffService $diffService, CheckStats $checkStats, CheckingGuard $guard)
     {
-        $this->checksBusy = $guard->isBusy($this->site->id);
+        $this->checksBusy = $guard->isBusy();
         $this->address->setRelation('site', $this->site);
 
         $latest = Snapshot::query()

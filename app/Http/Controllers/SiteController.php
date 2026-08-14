@@ -18,7 +18,6 @@ class SiteController extends Controller
                 'base_url' => $site->base_url,
                 'schedule_enabled' => $site->schedule_enabled,
                 'schedule_interval' => $site->schedule_interval,
-                'requests_per_minute' => $site->requests_per_minute,
                 'schedule_last_run_at' => null,
             ]);
 

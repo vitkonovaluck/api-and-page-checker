@@ -15,7 +15,6 @@ use Illuminate\Support\Carbon;
     'schedule_enabled',
     'schedule_interval',
     'schedule_last_run_at',
-    'requests_per_minute',
 ])]
 class Site extends Model
 {
@@ -42,34 +41,12 @@ class Site extends Model
         return [
             'schedule_enabled' => 'boolean',
             'schedule_last_run_at' => 'datetime',
-            'requests_per_minute' => 'integer',
         ];
     }
 
     public function addresses(): HasMany
     {
         return $this->hasMany(Address::class);
-    }
-
-    public function requestsPerMinute(): int
-    {
-        $value = (int) ($this->requests_per_minute ?: config('checking.max_per_minute', 30));
-
-        return max(1, $value);
-    }
-
-    public function checkIntervalMilliseconds(): int
-    {
-        return (int) round(60_000 / $this->requestsPerMinute());
-    }
-
-    public function estimatedCheckDurationSeconds(int $addressCount): int
-    {
-        if ($addressCount < 1) {
-            return 0;
-        }
-
-        return (int) ceil($addressCount * 60 / $this->requestsPerMinute());
     }
 
     public function checkRuns(): HasMany

@@ -8,7 +8,7 @@
         <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
             <div>
                 <h2 class="text-base font-semibold text-slate-900">Налаштування сайту</h2>
-                <p class="mt-0.5 text-sm text-slate-500">Назва, базовий URL, ліміт запитів і розклад перевірок</p>
+                <p class="mt-0.5 text-sm text-slate-500">Назва, базовий URL і розклад перевірок</p>
             </div>
             <button
                 type="button"
@@ -77,30 +77,6 @@
                 <p class="mt-3 text-xs text-slate-500">
                     Запуски вирівнюються по годиннику (наприклад, кожні 15 хв — о :00, :15, :30, :45), щоб контролювати навантаження.
                 </p>
-                <div class="mt-4">
-                    <label for="requests_per_minute" class="mb-1 block text-sm font-medium text-slate-700">Запитів на хвилину</label>
-                    <input
-                        type="number"
-                        id="requests_per_minute"
-                        wire:model.live.debounce.400ms="requests_per_minute"
-                        min="1"
-                        max="120"
-                        required
-                        class="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                    >
-                    @error('requests_per_minute') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-                    <p class="mt-2 text-xs text-slate-500">
-                        Пауза між запитами: {{ $checkIntervalSeconds }} с.
-                        @if ($site->addresses->isNotEmpty())
-                            Повний прогін {{ $site->addresses->count() }} адрес: {{ $estimatedDurationLabel }}.
-                        @endif
-                    </p>
-                    @if ($scheduleMayOverlap)
-                        <p class="mt-2 text-xs text-amber-700">
-                            Прогін довший за обраний період розкладу — наступний запуск пропустить сайт, поки йде поточна черга.
-                        </p>
-                    @endif
-                </div>
                 @if ($site->schedule_last_run_at)
                     <p class="mt-3 text-xs text-slate-500">
                         Останній запланований запуск: {{ $site->schedule_last_run_at->format('d.m.Y H:i:s') }}

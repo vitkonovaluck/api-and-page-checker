@@ -1,6 +1,5 @@
 # API Snapshot Checker — local Docker stack
 # UI: http://localhost:${APP_PORT:-8180}
-# phpMyAdmin: http://localhost:${PHPMYADMIN_PORT:-8181}
 # MySQL (host): 127.0.0.1:${DB_PORT:-3307}
 #
 # Check a project from two addresses at once by creating two sites, e.g.:
@@ -58,25 +57,6 @@ services:
     networks:
       - default
 
-  phpmyadmin:
-    image: phpmyadmin:5.2
-    container_name: api-checker-phpmyadmin
-    restart: unless-stopped
-    environment:
-      PMA_HOST: mysql
-      PMA_PORT: 3306
-      PMA_USER: ${DB_USERNAME:-api_checker}
-      PMA_PASSWORD: ${DB_PASSWORD:-secret}
-      UPLOAD_LIMIT: 256M
-      MEMORY_LIMIT: 512M
-    ports:
-      - "${PHPMYADMIN_PORT:-8181}:80"
-    depends_on:
-      mysql:
-        condition: service_healthy
-    networks:
-      - default
-
   init:
     <<: *php
     container_name: api-checker-init
@@ -129,7 +109,7 @@ services:
     <<: *php
     container_name: api-checker-queue
     restart: unless-stopped
-    command: ["php", "artisan", "queue:work-site-queues", "--tries=3", "--timeout=90", "--sleep=1"]
+    command: ["php", "artisan", "queue:work", "--tries=3", "--timeout=90", "--sleep=1"]
     depends_on:
       mysql:
         condition: service_healthy

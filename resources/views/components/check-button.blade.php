@@ -7,15 +7,11 @@
     'title' => null,
 ])
 
-@php
-    $isBlocked = $busy || $disabled;
-@endphp
-
 <form
     method="POST"
     action="{{ $action }}"
     x-data="{ local: false }"
-    @submit="if (local || {{ $isBlocked ? 'true' : 'false' }}) { $event.preventDefault(); return; } local = true"
+    @submit="if ($wire.checksBusy || {{ $disabled ? 'true' : 'false' }}) { $event.preventDefault(); return; } local = true"
 >
     @csrf
     <button
@@ -24,8 +20,8 @@
             title="{{ $title }}"
             aria-label="{{ $title }}"
         @endif
-        @disabled($isBlocked)
-        x-bind:disabled="local || {{ $isBlocked ? 'true' : 'false' }}"
+        @disabled($busy || $disabled)
+        x-bind:disabled="local || $wire.checksBusy || {{ $disabled ? 'true' : 'false' }}"
         {{ $attributes->class([
             'inline-flex items-center justify-center rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50',
             'gap-2 px-4 py-2 text-sm font-medium' => $label !== null,
@@ -33,17 +29,17 @@
         ]) }}
     >
         @if ($label === null)
-            <span x-show="!local && !{{ $busy ? 'true' : 'false' }}" class="inline-flex">
+            <span x-show="!local && !$wire.checksBusy" class="inline-flex">
                 @include('partials.icons.refresh')
             </span>
-            <span x-show="local || {{ $busy ? 'true' : 'false' }}" x-cloak class="inline-flex">
+            <span x-show="local || $wire.checksBusy" x-cloak class="inline-flex">
                 @include('partials.icons.spinner')
             </span>
         @else
-            <span x-show="local || {{ $busy ? 'true' : 'false' }}" x-cloak class="inline-flex">
+            <span x-show="local || $wire.checksBusy" x-cloak class="inline-flex">
                 @include('partials.icons.spinner')
             </span>
-            <span x-text="(local || {{ $busy ? 'true' : 'false' }}) ? @js($busyLabel) : @js($label)">
+            <span x-text="(local || $wire.checksBusy) ? @js($busyLabel) : @js($label)">
                 {{ $busy ? $busyLabel : $label }}
             </span>
         @endif

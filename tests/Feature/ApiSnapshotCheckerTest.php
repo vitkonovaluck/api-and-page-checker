@@ -9,7 +9,6 @@ use App\Livewire\Charts\ResponseTimeChartModal;
 use App\Livewire\Sites\AddressListModal;
 use App\Livewire\Sites\CreateSiteModal;
 use App\Livewire\Sites\ErrorSnapshotsModal;
-use App\Livewire\Sites\Index as SitesIndex;
 use App\Livewire\Sites\Show;
 use App\Livewire\Sites\SiteSettingsModal;
 use App\Models\Address;
@@ -42,33 +41,6 @@ class ApiSnapshotCheckerTest extends TestCase
             ->assertOk()
             ->assertSee('Список сайтів')
             ->assertSeeLivewire(CreateSiteModal::class);
-    }
-
-    public function test_index_marks_only_the_busy_site_check_as_busy(): void
-    {
-        config(['queue.default' => 'database']);
-
-        $busySite = Site::query()->create([
-            'name' => 'Busy Site',
-            'base_url' => 'https://busy.example.com',
-        ]);
-        $idleSite = Site::query()->create([
-            'name' => 'Idle Site',
-            'base_url' => 'https://idle.example.com',
-        ]);
-        $busyAddress = Address::query()->create([
-            'site_id' => $busySite->id,
-            'endpoint' => '/busy',
-        ]);
-        Address::query()->create([
-            'site_id' => $idleSite->id,
-            'endpoint' => '/idle',
-        ]);
-
-        CheckAddressJob::dispatch($busyAddress);
-
-        Livewire::test(SitesIndex::class)
-            ->assertSet('busySiteIds', [$busySite->id]);
     }
 
     public function test_can_create_site_with_optional_endpoint(): void
@@ -182,7 +154,6 @@ class ApiSnapshotCheckerTest extends TestCase
             ->assertSessionHas('success', 'Перевірку 2 адрес поставлено в чергу.');
 
         Queue::assertPushed(CheckAddressJob::class, 2);
-        Queue::assertPushedOn('site-'.$site->id, CheckAddressJob::class);
         Queue::assertPushed(CheckAddressJob::class, function (CheckAddressJob $job) use ($a1) {
             return $job->address->is($a1) && $job->checkRunId !== null;
         });
@@ -200,7 +171,7 @@ class ApiSnapshotCheckerTest extends TestCase
             'endpoint' => '/data',
         ]);
 
-        Cache::put(CheckingGuard::manualCacheKey($site->id), true, 60);
+        Cache::put(CheckingGuard::MANUAL_KEY, true, 60);
 
         Http::fake([
             'https://api.example.com/data' => Http::response(['ok' => true], 200),
@@ -214,37 +185,10 @@ class ApiSnapshotCheckerTest extends TestCase
         $this->assertSame(0, $address->snapshots()->count());
     }
 
-    public function test_manual_check_on_another_site_is_allowed_while_one_is_busy(): void
-    {
-        $busySite = Site::query()->create([
-            'name' => 'Busy',
-            'base_url' => 'https://busy.example.com',
-        ]);
-        $freeSite = Site::query()->create([
-            'name' => 'Free',
-            'base_url' => 'https://api.example.com',
-        ]);
-        $address = Address::query()->create([
-            'site_id' => $freeSite->id,
-            'endpoint' => '/data',
-        ]);
-
-        Cache::put(CheckingGuard::manualCacheKey($busySite->id), true, 60);
-
-        Http::fake([
-            'https://api.example.com/data' => Http::response(['ok' => true], 200),
-        ]);
-
-        $this->post("/sites/{$freeSite->id}/addresses/{$address->id}/check")
-            ->assertRedirect(route('addresses.show', [$freeSite, $address]))
-            ->assertSessionHas('success');
-
-        $this->assertSame(1, $address->snapshots()->count());
-    }
-
     public function test_scheduled_command_skips_when_manual_check_is_running(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-08-07 10:15:00'));
+        Cache::put(CheckingGuard::MANUAL_KEY, true, 60);
         Queue::fake();
 
         $site = Site::query()->create([
@@ -259,56 +203,10 @@ class ApiSnapshotCheckerTest extends TestCase
             'schedule_enabled' => true,
         ]);
 
-        Cache::put(CheckingGuard::manualCacheKey($site->id), true, 60);
-
         Artisan::call('sites:run-scheduled');
 
         Queue::assertNothingPushed();
         $this->assertNull($site->fresh()->schedule_last_run_at);
-
-        Carbon::setTestNow();
-    }
-
-    public function test_scheduled_command_still_queues_other_sites_when_one_is_busy(): void
-    {
-        Carbon::setTestNow(Carbon::parse('2026-08-07 10:15:00'));
-        Queue::fake();
-
-        $busySite = Site::query()->create([
-            'name' => 'Busy',
-            'base_url' => 'https://busy.example.com',
-            'schedule_enabled' => true,
-            'schedule_interval' => '5m',
-        ]);
-        Address::query()->create([
-            'site_id' => $busySite->id,
-            'endpoint' => '/busy',
-            'schedule_enabled' => true,
-        ]);
-
-        $freeSite = Site::query()->create([
-            'name' => 'Free',
-            'base_url' => 'https://api.example.com',
-            'schedule_enabled' => true,
-            'schedule_interval' => '5m',
-        ]);
-        $freeAddress = Address::query()->create([
-            'site_id' => $freeSite->id,
-            'endpoint' => '/free',
-            'schedule_enabled' => true,
-        ]);
-
-        Cache::put(CheckingGuard::manualCacheKey($busySite->id), true, 60);
-
-        Artisan::call('sites:run-scheduled');
-
-        Queue::assertPushed(CheckAddressJob::class, 1);
-        Queue::assertPushedOn('site-'.$freeSite->id, CheckAddressJob::class);
-        Queue::assertPushed(CheckAddressJob::class, function (CheckAddressJob $job) use ($freeAddress) {
-            return $job->address->is($freeAddress);
-        });
-        $this->assertNull($busySite->fresh()->schedule_last_run_at);
-        $this->assertNotNull($freeSite->fresh()->schedule_last_run_at);
 
         Carbon::setTestNow();
     }
@@ -332,7 +230,6 @@ class ApiSnapshotCheckerTest extends TestCase
             'base_url' => 'https://api.example.com',
             'schedule_enabled' => true,
             'schedule_interval' => '15m',
-            'requests_per_minute' => 12,
         ]);
         $address = Address::query()->create([
             'site_id' => $site->id,
@@ -361,7 +258,6 @@ class ApiSnapshotCheckerTest extends TestCase
         $this->assertSame('https://api.example.com', $copy->base_url);
         $this->assertTrue($copy->schedule_enabled);
         $this->assertSame('15m', $copy->schedule_interval);
-        $this->assertSame(12, $copy->requests_per_minute);
         $this->assertNull($copy->schedule_last_run_at);
         $this->assertSame(1, $copy->addresses()->count());
         $copiedAddress = $copy->addresses()->first();
@@ -799,7 +695,6 @@ class ApiSnapshotCheckerTest extends TestCase
         Artisan::call('sites:run-scheduled');
 
         Queue::assertPushed(CheckAddressJob::class, 1);
-        Queue::assertPushedOn('site-'.$site->id, CheckAddressJob::class);
         Queue::assertPushed(CheckAddressJob::class, function (CheckAddressJob $job) use ($included) {
             return $job->address->is($included) && $job->checkRunId !== null;
         });
@@ -951,25 +846,6 @@ class ApiSnapshotCheckerTest extends TestCase
 
         $this->assertSame(0, $site->snapshots()->count());
         $this->assertSame(1, $otherSite->snapshots()->count());
-    }
-
-    public function test_can_update_site_requests_per_minute_from_settings(): void
-    {
-        $site = Site::query()->create([
-            'name' => 'Demo',
-            'base_url' => 'https://api.example.com',
-        ]);
-        Address::query()->create([
-            'site_id' => $site->id,
-            'endpoint' => '/one',
-        ]);
-
-        Livewire::test(SiteSettingsModal::class, ['site' => $site])
-            ->set('requests_per_minute', 12)
-            ->call('save')
-            ->assertRedirect("/sites/{$site->id}");
-
-        $this->assertSame(12, $site->fresh()->requests_per_minute);
     }
 
     public function test_site_show_highlights_changed_status_with_previous(): void
