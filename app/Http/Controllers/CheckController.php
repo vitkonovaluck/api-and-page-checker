@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Jobs\CheckAddressJob;
@@ -20,7 +22,7 @@ class CheckController extends Controller
     ): RedirectResponse {
         abort_unless($address->site_id === $site->id, 404);
 
-        $redirect = $guard->runManual(function () use ($site, $address, $checker) {
+        $redirect = $guard->runManual($site->id, function () use ($site, $address, $checker) {
             $run = CheckRun::start($site, CheckRun::SOURCE_MANUAL);
             $result = $checker->check($address, $run->id);
             $diff = $result['diff'];
@@ -37,12 +39,12 @@ class CheckController extends Controller
                 ->with('diff_highlight', true);
         });
 
-        return $redirect ?? back()->with('error', 'Зараз уже виконується перевірка. Зачекайте завершення.');
+        return $redirect ?? back()->with('error', 'Зараз уже виконується перевірка цього сайту. Зачекайте завершення.');
     }
 
     public function storeAll(Site $site, CheckingGuard $guard): RedirectResponse
     {
-        $redirect = $guard->runManual(function () use ($site) {
+        $redirect = $guard->runManual($site->id, function () use ($site) {
             $addresses = $site->addresses()->orderBy('id')->get();
 
             if ($addresses->isEmpty()) {
@@ -53,17 +55,13 @@ class CheckController extends Controller
 
             $run = CheckRun::start($site, CheckRun::SOURCE_MANUAL);
 
-            foreach ($addresses as $address) {
-                CheckAddressJob::dispatch($address, $run->id);
-            }
-
-            $checked = $addresses->count();
+            $checked = CheckAddressJob::dispatchForSite($site, $addresses, $run->id);
 
             return redirect()
                 ->route('sites.show', $site)
                 ->with('success', "Перевірку {$checked} адрес поставлено в чергу.");
         });
 
-        return $redirect ?? back()->with('error', 'Зараз уже виконується перевірка. Зачекайте завершення.');
+        return $redirect ?? back()->with('error', 'Зараз уже виконується перевірка цього сайту. Зачекайте завершення.');
     }
 }

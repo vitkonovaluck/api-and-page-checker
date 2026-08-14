@@ -7,6 +7,7 @@
                 <p class="mt-1 break-all font-mono text-sm text-slate-600">{{ $site->base_url }}</p>
                 <p class="mt-1 text-sm text-slate-600">
                     Адреси цього сайту ({{ $site->addresses->count() }})
+                    <span class="ml-2 text-slate-500">· {{ $site->requestsPerMinute() }} запитів/хв</span>
                     @if ($site->schedule_enabled)
                         <span class="ml-2 text-emerald-700">
                             · розклад: {{ \App\Models\Site::SCHEDULE_INTERVAL_LABELS[$site->schedule_interval] ?? $site->schedule_interval }}

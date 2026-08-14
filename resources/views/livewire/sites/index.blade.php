@@ -57,7 +57,7 @@
                                     <div class="flex flex-wrap justify-end gap-1.5">
                                         <x-check-button
                                             :action="route('sites.check', $site)"
-                                            :busy="$checksBusy"
+                                            :busy="in_array($site->id, $busySiteIds, false)"
                                             :disabled="$site->addresses_count === 0"
                                             title="Перевірити сайт"
                                         />

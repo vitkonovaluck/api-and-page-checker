@@ -18,7 +18,7 @@ class Show extends Component
     public function mount(Site $site, CheckingGuard $guard): void
     {
         $this->site = $site;
-        $this->checksBusy = $guard->isBusy();
+        $this->checksBusy = $guard->isBusy($site->id);
     }
 
     public function copy(): void
@@ -31,6 +31,7 @@ class Show extends Component
                 'base_url' => $this->site->base_url,
                 'schedule_enabled' => $this->site->schedule_enabled,
                 'schedule_interval' => $this->site->schedule_interval,
+                'requests_per_minute' => $this->site->requests_per_minute,
                 'schedule_last_run_at' => null,
             ]);
 
@@ -68,12 +69,12 @@ class Show extends Component
     public function refreshData(CheckingGuard $guard): void
     {
         $this->site->refresh();
-        $this->checksBusy = $guard->isBusy();
+        $this->checksBusy = $guard->isBusy($this->site->id);
     }
 
     public function render(CheckStats $checkStats, CheckingGuard $guard)
     {
-        $this->checksBusy = $guard->isBusy();
+        $this->checksBusy = $guard->isBusy($this->site->id);
         $this->site->load(['addresses' => fn ($q) => $q->with(['latestSnapshot', 'previousSnapshot'])->orderBy('id')]);
 
         $addressStats = $checkStats->forAddresses($this->site->addresses);
