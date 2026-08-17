@@ -29,6 +29,7 @@ class Index extends Component
                 'schedule_enabled' => $site->schedule_enabled,
                 'schedule_interval' => $site->schedule_interval,
                 'schedule_last_run_at' => null,
+                'requests_per_minute' => $site->requests_per_minute,
             ]);
 
             foreach ($site->addresses as $address) {

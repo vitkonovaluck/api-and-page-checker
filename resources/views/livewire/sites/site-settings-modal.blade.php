@@ -8,7 +8,7 @@
         <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
             <div>
                 <h2 class="text-base font-semibold text-slate-900">Налаштування сайту</h2>
-                <p class="mt-0.5 text-sm text-slate-500">Назва, базовий URL і розклад перевірок</p>
+                <p class="mt-0.5 text-sm text-slate-500">Назва, базовий URL, темп і розклад перевірок</p>
             </div>
             <button
                 type="button"
@@ -47,6 +47,30 @@
                     >
                     @error('base_url') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                 </div>
+            </div>
+
+            <div
+                class="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                x-data="{ rpm: {{ (int) $requestsPerMinute }} }"
+            >
+                <h3 class="mb-3 text-sm font-semibold text-slate-900">Темп перевірок</h3>
+                <label for="settings_requests_per_minute" class="mb-1 block text-sm font-medium text-slate-700">Перевірок на хвилину</label>
+                <input
+                    type="number"
+                    id="settings_requests_per_minute"
+                    min="{{ \App\Models\Site::CHECKS_PER_MINUTE_MIN }}"
+                    max="{{ \App\Models\Site::CHECKS_PER_MINUTE_MAX }}"
+                    step="1"
+                    wire:model="requestsPerMinute"
+                    x-model.number="rpm"
+                    required
+                    class="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                >
+                @error('requestsPerMinute') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                <p class="mt-2 text-xs text-slate-500">
+                    <span x-text="rpm > 0 ? ('Пауза між перевірками ≈ ' + Math.round(60 / rpm) + ' с. ') : ''"></span>
+                    Для сторінок, що шлють кілька API-запитів, ставте 5–10, щоб уникати 429.
+                </p>
             </div>
 
             <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">

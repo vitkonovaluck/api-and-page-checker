@@ -15,9 +15,16 @@ use Illuminate\Support\Carbon;
     'schedule_enabled',
     'schedule_interval',
     'schedule_last_run_at',
+    'requests_per_minute',
 ])]
 class Site extends Model
 {
+    public const CHECKS_PER_MINUTE_MIN = 1;
+
+    public const CHECKS_PER_MINUTE_MAX = 120;
+
+    public const CHECKS_PER_MINUTE_DEFAULT = 32;
+
     public const SCHEDULE_INTERVALS = [
         '5m' => 5,
         '15m' => 15,
@@ -42,6 +49,15 @@ class Site extends Model
             'schedule_enabled' => 'boolean',
             'schedule_last_run_at' => 'datetime',
         ];
+    }
+
+    public function checksPerMinute(): int
+    {
+        if ($this->requests_per_minute !== null) {
+            return max(0, (int) $this->requests_per_minute);
+        }
+
+        return (int) config('checking.requests_per_minute', self::CHECKS_PER_MINUTE_DEFAULT);
     }
 
     public function addresses(): HasMany

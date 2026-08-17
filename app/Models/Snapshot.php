@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ResponseTimeMetric;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -50,5 +51,43 @@ class Snapshot extends Model
             ->where('id', '<', $this->id)
             ->orderByDesc('id')
             ->first();
+    }
+
+    public function ttfbMs(): ?int
+    {
+        $value = $this->timing['ttfb_ms'] ?? null;
+
+        return is_numeric($value) ? (int) $value : null;
+    }
+
+    public function timeMs(ResponseTimeMetric $metric): ?int
+    {
+        return match ($metric) {
+            ResponseTimeMetric::Total => $this->response_time_ms,
+            ResponseTimeMetric::Ttfb => $this->ttfbMs(),
+        };
+    }
+
+    public function formattedTimeMs(ResponseTimeMetric $metric): string
+    {
+        $value = $this->timeMs($metric);
+
+        return $value === null ? '—' : $value.' ms';
+    }
+
+    public function timeDeltaMs(?self $previous, ResponseTimeMetric $metric): ?int
+    {
+        if ($previous === null) {
+            return null;
+        }
+
+        $current = $this->timeMs($metric);
+        $old = $previous->timeMs($metric);
+
+        if ($current === null || $old === null) {
+            return null;
+        }
+
+        return $current - $old;
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Sites;
 
+use App\Livewire\Concerns\InteractsWithResponseTimeMetric;
 use App\Models\Address;
 use App\Models\Site;
 use App\Services\CheckingGuard;
@@ -11,6 +12,8 @@ use Livewire\Component;
 
 class Show extends Component
 {
+    use InteractsWithResponseTimeMetric;
+
     public Site $site;
 
     public bool $checksBusy = false;
@@ -19,6 +22,7 @@ class Show extends Component
     {
         $this->site = $site;
         $this->checksBusy = $guard->isBusy();
+        $this->hydrateResponseTimeMetric();
     }
 
     public function copy(): void
@@ -32,6 +36,7 @@ class Show extends Component
                 'schedule_enabled' => $this->site->schedule_enabled,
                 'schedule_interval' => $this->site->schedule_interval,
                 'schedule_last_run_at' => null,
+                'requests_per_minute' => $this->site->requests_per_minute,
             ]);
 
             foreach ($this->site->addresses as $address) {
@@ -76,16 +81,18 @@ class Show extends Component
         $this->checksBusy = $guard->isBusy();
         $this->site->load(['addresses' => fn ($q) => $q->with(['latestSnapshot', 'previousSnapshot'])->orderBy('id')]);
 
-        $addressStats = $checkStats->forAddresses($this->site->addresses);
+        $metric = $this->responseTimeMetric();
+        $addressStats = $checkStats->forAddresses($this->site->addresses, $metric);
         $scheduleStats = $this->site->schedule_enabled
-            ? $checkStats->forSite($this->site, scheduledOnly: true)
+            ? $checkStats->forSite($this->site, scheduledOnly: true, metric: $metric)
             : null;
-        $siteStats = $checkStats->forSite($this->site, scheduledOnly: false);
+        $siteStats = $checkStats->forSite($this->site, scheduledOnly: false, metric: $metric);
 
         return view('livewire.sites.show', [
             'addressStats' => $addressStats,
             'scheduleStats' => $scheduleStats,
             'siteStats' => $siteStats,
+            'metricEnum' => $metric,
         ])->title($this->site->name.' — API Snapshot Checker');
     }
 }

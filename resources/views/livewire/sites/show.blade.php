@@ -12,6 +12,9 @@
                             · розклад: {{ \App\Models\Site::SCHEDULE_INTERVAL_LABELS[$site->schedule_interval] ?? $site->schedule_interval }}
                         </span>
                     @endif
+                    @if ($site->checksPerMinute() > 0)
+                        <span class="ml-2 text-slate-500">· {{ $site->checksPerMinute() }} перевірок/хв</span>
+                    @endif
                 </p>
             </div>
             <div class="flex flex-wrap gap-2">
@@ -30,6 +33,7 @@
                 >
                     Список адрес
                 </button>
+                @include('partials.response-time-metric-toggle')
                 <button
                     type="button"
                     wire:click="$dispatch('open-response-time-chart')"
@@ -85,7 +89,7 @@
             <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 @if ($site->schedule_enabled && $scheduleStats && $scheduleStats['checks_count'] > 0)
                     <div class="rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-3">
-                        <dt class="text-xs uppercase tracking-wide text-emerald-800/70">Сер. час (розклад)</dt>
+                        <dt class="text-xs uppercase tracking-wide text-emerald-800/70">{{ $metricEnum->scheduleAverageLabel() }}</dt>
                         <dd class="mt-1 text-lg font-semibold text-emerald-900">
                             {{ $scheduleStats['avg_response_time_ms'] !== null ? $scheduleStats['avg_response_time_ms'].' ms' : '—' }}
                         </dd>
@@ -114,7 +118,7 @@
                     </div>
                 @endif
                 <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                    <dt class="text-xs uppercase tracking-wide text-slate-500">Сер. час (остання)</dt>
+                    <dt class="text-xs uppercase tracking-wide text-slate-500">{{ $metricEnum->latestAverageLabel() }}</dt>
                     <dd class="mt-1 text-lg font-semibold text-slate-900">
                         {{ $siteStats['avg_latest_response_time_ms'] !== null ? $siteStats['avg_latest_response_time_ms'].' ms' : '—' }}
                     </dd>
@@ -123,7 +127,7 @@
                     </p>
                 </div>
                 <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                    <dt class="text-xs uppercase tracking-wide text-slate-500">Сер. час (усі)</dt>
+                    <dt class="text-xs uppercase tracking-wide text-slate-500">{{ $metricEnum->allAverageLabel() }}</dt>
                     <dd class="mt-1 text-lg font-semibold text-slate-900">
                         {{ $siteStats['avg_response_time_ms'] !== null ? $siteStats['avg_response_time_ms'].' ms' : '—' }}
                     </dd>
@@ -170,9 +174,9 @@
                             <th class="px-3 py-2">Ендпоїнт</th>
                             <th class="w-40 px-3 py-2">Остання перевірка</th>
                             <th class="w-24 px-3 py-2">Статус</th>
-                            <th class="w-28 px-3 py-2">Час відповіді</th>
+                            <th class="w-28 px-3 py-2">{{ $metricEnum->columnLabel() }}</th>
                             <th class="w-24 px-3 py-2">Body</th>
-                            <th class="w-24 px-3 py-2">Сер. час</th>
+                            <th class="w-24 px-3 py-2">{{ $metricEnum->averageLabel() }}</th>
                             <th class="w-28 px-3 py-2">Сер. помилок</th>
                             <th class="w-36 px-3 py-2 text-right">Дії</th>
                         </tr>
@@ -184,9 +188,7 @@
                                 $latest = $address->latestSnapshot;
                                 $previous = $address->previousSnapshot;
                                 $statusChanged = $latest && $previous && $previous->status_code !== $latest->status_code;
-                                $responseTimeDelta = ($latest && $previous)
-                                    ? $latest->response_time_ms - $previous->response_time_ms
-                                    : null;
+                                $responseTimeDelta = $latest?->timeDeltaMs($previous, $metricEnum);
                                 $bodyChanged = $latest && $previous
                                     ? $latest->body_hash !== $previous->body_hash
                                     : null;
@@ -245,11 +247,11 @@
                                 <td class="px-3 py-1.5 text-slate-700">
                                     @if ($latest)
                                         <span class="inline-flex items-center gap-1">
-                                            {{ $latest->response_time_ms }} ms
+                                            {{ $latest->formattedTimeMs($metricEnum) }}
                                             @if ($responseTimeDelta !== null && $responseTimeDelta > 0)
-                                                <span class="text-red-600" title="Було {{ $previous->response_time_ms }} ms">↑</span>
+                                                <span class="text-red-600" title="Було {{ $previous->formattedTimeMs($metricEnum) }}">↑</span>
                                             @elseif ($responseTimeDelta !== null && $responseTimeDelta < 0)
-                                                <span class="text-emerald-600" title="Було {{ $previous->response_time_ms }} ms">↓</span>
+                                                <span class="text-emerald-600" title="Було {{ $previous->formattedTimeMs($metricEnum) }}">↓</span>
                                             @endif
                                         </span>
                                     @else

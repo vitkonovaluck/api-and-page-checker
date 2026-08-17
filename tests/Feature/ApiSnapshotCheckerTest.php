@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Jobs\CheckAddressJob;
 use App\Livewire\Addresses\AddressSettingsModal;
 use App\Livewire\Addresses\CreateAddressModal;
+use App\Livewire\Addresses\Show as AddressShow;
 use App\Livewire\Charts\ResponseTimeChartModal;
 use App\Livewire\Sites\AddressListModal;
 use App\Livewire\Sites\CreateSiteModal;
@@ -230,6 +231,7 @@ class ApiSnapshotCheckerTest extends TestCase
             'base_url' => 'https://api.example.com',
             'schedule_enabled' => true,
             'schedule_interval' => '15m',
+            'requests_per_minute' => 5,
         ]);
         $address = Address::query()->create([
             'site_id' => $site->id,
@@ -258,6 +260,7 @@ class ApiSnapshotCheckerTest extends TestCase
         $this->assertSame('https://api.example.com', $copy->base_url);
         $this->assertTrue($copy->schedule_enabled);
         $this->assertSame('15m', $copy->schedule_interval);
+        $this->assertSame(5, $copy->requests_per_minute);
         $this->assertNull($copy->schedule_last_run_at);
         $this->assertSame(1, $copy->addresses()->count());
         $copiedAddress = $copy->addresses()->first();
@@ -268,6 +271,38 @@ class ApiSnapshotCheckerTest extends TestCase
         ], $copiedAddress->request_headers);
         $this->assertSame(0, $copiedAddress->snapshots()->count());
         $this->assertSame(1, $address->snapshots()->count());
+    }
+
+    public function test_can_set_site_checks_per_minute_in_settings(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+
+        Livewire::test(SiteSettingsModal::class, ['site' => $site])
+            ->set('requestsPerMinute', 5)
+            ->call('save')
+            ->assertRedirect("/sites/{$site->id}")
+            ->assertSessionHas('success', 'Сайт оновлено.');
+
+        $this->assertSame(5, $site->fresh()->requests_per_minute);
+        $this->assertSame(5, $site->fresh()->checksPerMinute());
+    }
+
+    public function test_site_settings_reject_checks_per_minute_below_minimum(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+
+        Livewire::test(SiteSettingsModal::class, ['site' => $site])
+            ->set('requestsPerMinute', 0)
+            ->call('save')
+            ->assertHasErrors(['requestsPerMinute']);
+
+        $this->assertNull($site->fresh()->requests_per_minute);
     }
 
     public function test_can_create_address_with_request_headers(): void
@@ -498,6 +533,106 @@ class ApiSnapshotCheckerTest extends TestCase
             ->assertSee('address-response-time-chart')
             ->call('setPeriod', '12h')
             ->assertSet('period', '12h');
+    }
+
+    public function test_site_page_can_switch_displayed_times_to_ttfb(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'TTFB Site',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'name' => 'Users',
+            'endpoint' => '/users',
+        ]);
+        Snapshot::query()->create([
+            'address_id' => $address->id,
+            'status_code' => 200,
+            'headers' => [],
+            'body' => '{}',
+            'body_hash' => hash('sha256', '{}'),
+            'response_time_ms' => 400,
+            'timing' => [
+                'dns_ms' => 0,
+                'connect_ms' => 0,
+                'tls_ms' => 0,
+                'ttfb_ms' => 40,
+                'download_ms' => 360,
+                'total_ms' => 400,
+            ],
+        ]);
+        Snapshot::query()->create([
+            'address_id' => $address->id,
+            'status_code' => 200,
+            'headers' => [],
+            'body' => '{}',
+            'body_hash' => hash('sha256', '{}'),
+            'response_time_ms' => 600,
+            'timing' => [
+                'dns_ms' => 0,
+                'connect_ms' => 0,
+                'tls_ms' => 0,
+                'ttfb_ms' => 80,
+                'download_ms' => 520,
+                'total_ms' => 600,
+            ],
+        ]);
+
+        Livewire::test(Show::class, ['site' => $site])
+            ->assertSee('Час відповіді')
+            ->assertSee('Сер. час (усі)')
+            ->assertSee('500 ms')
+            ->assertDontSee('Сер. TTFB (усі)')
+            ->call('setMetric', 'ttfb')
+            ->assertSet('metric', 'ttfb')
+            ->assertSee('Сер. TTFB (усі)')
+            ->assertSee('60 ms')
+            ->assertDontSee('500 ms');
+    }
+
+    public function test_address_page_and_chart_switch_to_ttfb_together(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'TTFB Address',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'name' => 'Users',
+            'endpoint' => '/users',
+        ]);
+        Snapshot::query()->create([
+            'address_id' => $address->id,
+            'status_code' => 200,
+            'headers' => [],
+            'body' => '{}',
+            'body_hash' => hash('sha256', '{}'),
+            'response_time_ms' => 250,
+            'timing' => [
+                'dns_ms' => 0,
+                'connect_ms' => 0,
+                'tls_ms' => 0,
+                'ttfb_ms' => 55,
+                'download_ms' => 195,
+                'total_ms' => 250,
+            ],
+        ]);
+
+        Livewire::test(AddressShow::class, ['site' => $site, 'address' => $address])
+            ->assertSee('250 ms')
+            ->call('setMetric', 'ttfb')
+            ->assertSee('55 ms')
+            ->assertSee('Середній TTFB');
+
+        Livewire::test(ResponseTimeChartModal::class, [
+            'mode' => 'address',
+            'addressId' => $address->id,
+            'chartId' => 'address-response-time-chart',
+        ])
+            ->call('open')
+            ->assertSet('metric', 'ttfb')
+            ->assertSee('Історія TTFB');
     }
 
     public function test_error_snapshots_modal_lists_failed_schedule_requests(): void
