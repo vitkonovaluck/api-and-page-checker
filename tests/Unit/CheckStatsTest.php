@@ -2,6 +2,9 @@
 
 namespace Tests\Unit;
 
+use App\Enums\ResponseTimeMetric;
+use App\Livewire\Charts\ResponseTimeChartModal;
+use App\Livewire\Sites\ErrorSnapshotsModal;
 use App\Models\Address;
 use App\Models\CheckRun;
 use App\Models\Site;
@@ -110,6 +113,50 @@ class CheckStatsTest extends TestCase
         $this->assertSame(2, $stats['latest_checks_count']);
     }
 
+    public function test_averages_ttfb_from_timing_json(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/data',
+        ]);
+
+        $this->createSnapshot($address, 400, null, timing: $this->timing(40));
+        $this->createSnapshot($address, 800, null, timing: $this->timing(60));
+        $this->createSnapshot($address, 1200, null);
+
+        $total = app(CheckStats::class)->forAddress($address, ResponseTimeMetric::Total);
+        $ttfb = app(CheckStats::class)->forAddress($address, ResponseTimeMetric::Ttfb);
+
+        $this->assertSame(800, $total['avg_response_time_ms']);
+        $this->assertSame(50, $ttfb['avg_response_time_ms']);
+    }
+
+    public function test_address_chart_uses_ttfb_values_when_selected(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/data',
+        ]);
+
+        $this->createSnapshot($address, 500, null, now()->subHours(2)->toDateTimeString(), timing: $this->timing(80));
+        $this->createSnapshot($address, 700, null, now()->subMinutes(10)->toDateTimeString(), timing: $this->timing(120));
+        $this->createSnapshot($address, 900, null, now()->subMinutes(5)->toDateTimeString());
+
+        $chart = app(CheckStats::class)->responseTimeChartForAddress($address, '6h', ResponseTimeMetric::Ttfb);
+
+        $this->assertSame([80, 120], $chart['values']);
+        $this->assertSame(100, $chart['avg_response_time_ms']);
+        $this->assertSame(2, $chart['checks_count']);
+    }
+
     public function test_address_chart_uses_selected_period_sample(): void
     {
         $site = Site::query()->create([
@@ -180,7 +227,7 @@ class CheckStatsTest extends TestCase
         $this->get("/sites/{$site->id}")
             ->assertOk()
             ->assertSee('Графік')
-            ->assertSeeLivewire(\App\Livewire\Charts\ResponseTimeChartModal::class)
+            ->assertSeeLivewire(ResponseTimeChartModal::class)
             ->assertSee('site-response-time-chart');
 
         $this->get("/sites/{$site->id}/addresses/{$address->id}")
@@ -212,7 +259,7 @@ class CheckStatsTest extends TestCase
             ->assertSee('Сер. час (розклад)')
             ->assertSee('Сер. помилок / запуск')
             ->assertSee('Переглянути помилки')
-            ->assertSeeLivewire(\App\Livewire\Sites\ErrorSnapshotsModal::class)
+            ->assertSeeLivewire(ErrorSnapshotsModal::class)
             ->assertSee('Сер. час (остання)')
             ->assertSee('200 ms')
             ->assertSee('Сер. час');
@@ -328,6 +375,7 @@ class CheckStatsTest extends TestCase
         ?string $errorMessage,
         ?string $createdAt = null,
         ?int $checkRunId = null,
+        ?array $timing = null,
     ): Snapshot {
         $snapshot = Snapshot::query()->create([
             'address_id' => $address->id,
@@ -337,6 +385,7 @@ class CheckStatsTest extends TestCase
             'body' => '{}',
             'body_hash' => hash('sha256', '{}'),
             'response_time_ms' => $responseTimeMs,
+            'timing' => $timing,
             'error_message' => $errorMessage,
         ]);
 
@@ -346,5 +395,27 @@ class CheckStatsTest extends TestCase
         }
 
         return $snapshot;
+    }
+
+    /**
+     * @return array{
+     *     dns_ms: int,
+     *     connect_ms: int,
+     *     tls_ms: int,
+     *     ttfb_ms: int,
+     *     download_ms: int,
+     *     total_ms: int
+     * }
+     */
+    private function timing(int $ttfbMs): array
+    {
+        return [
+            'dns_ms' => 0,
+            'connect_ms' => 0,
+            'tls_ms' => 0,
+            'ttfb_ms' => $ttfbMs,
+            'download_ms' => 0,
+            'total_ms' => $ttfbMs,
+        ];
     }
 }

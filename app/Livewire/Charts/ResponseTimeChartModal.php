@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Charts;
 
+use App\Livewire\Concerns\InteractsWithResponseTimeMetric;
 use App\Models\Address;
 use App\Models\Site;
 use App\Services\CheckStats;
@@ -11,6 +12,8 @@ use Livewire\Component;
 
 class ResponseTimeChartModal extends Component
 {
+    use InteractsWithResponseTimeMetric;
+
     public string $mode = 'site';
 
     public ?int $siteId = null;
@@ -38,12 +41,14 @@ class ResponseTimeChartModal extends Component
         $this->title = $title;
         $this->chartId = $chartId;
         $this->period = CheckStats::DEFAULT_RESPONSE_TIME_PERIOD;
+        $this->hydrateResponseTimeMetric();
     }
 
     #[On('open-response-time-chart')]
     public function open(): void
     {
         $this->show = true;
+        $this->hydrateResponseTimeMetric();
         unset($this->chart);
         $this->dispatch('chart-should-render');
     }
@@ -74,20 +79,27 @@ class ResponseTimeChartModal extends Component
         $this->dispatch('chart-should-render');
     }
 
+    protected function afterResponseTimeMetricChanged(): void
+    {
+        unset($this->chart);
+        $this->dispatch('chart-should-render');
+    }
+
     #[Computed]
     public function chart(): array
     {
         $checkStats = app(CheckStats::class);
+        $metric = $this->responseTimeMetric();
 
         if ($this->mode === 'address') {
             $address = Address::query()->findOrFail($this->addressId);
 
-            return $checkStats->responseTimeChartForAddress($address, $this->period);
+            return $checkStats->responseTimeChartForAddress($address, $this->period, $metric);
         }
 
         $site = Site::query()->findOrFail($this->siteId);
 
-        return $checkStats->responseTimeChartForSite($site, $this->period);
+        return $checkStats->responseTimeChartForSite($site, $this->period, $metric);
     }
 
     public function render()

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\ResponseTimeMetric;
 use App\Models\Address;
 use App\Models\CheckRun;
 use App\Models\Site;
@@ -38,7 +39,7 @@ class CheckStats
      *     avg_errors: float|null
      * }
      */
-    public function forSnapshots(Collection $snapshots): array
+    public function forSnapshots(Collection $snapshots, ResponseTimeMetric $metric = ResponseTimeMetric::Total): array
     {
         $count = $snapshots->count();
 
@@ -52,7 +53,7 @@ class CheckStats
 
         return [
             'checks_count' => $count,
-            'avg_response_time_ms' => (int) round((float) $snapshots->avg('response_time_ms')),
+            'avg_response_time_ms' => $this->averageTimeMs($snapshots, $metric),
             'error_count' => $errorCount,
             'avg_errors' => round($errorCount / $count, 2),
         ];
@@ -66,12 +67,12 @@ class CheckStats
      *     avg_errors: float|null
      * }
      */
-    public function forAddress(Address $address): array
+    public function forAddress(Address $address, ResponseTimeMetric $metric = ResponseTimeMetric::Total): array
     {
         $row = Snapshot::query()
             ->where('address_id', $address->id)
             ->selectRaw('COUNT(*) as checks_count')
-            ->selectRaw('AVG(response_time_ms) as avg_response_time_ms')
+            ->selectRaw($this->avgTimeSelectRaw($metric))
             ->selectRaw('SUM(CASE WHEN error_message IS NOT NULL AND error_message != \'\' THEN 1 ELSE 0 END) as error_count')
             ->first();
 
@@ -94,7 +95,7 @@ class CheckStats
      *     latest_checks_count: int
      * }
      */
-    public function forSite(Site $site, bool $scheduledOnly = false): array
+    public function forSite(Site $site, bool $scheduledOnly = false, ResponseTimeMetric $metric = ResponseTimeMetric::Total): array
     {
         $addressQuery = $site->addresses();
         if ($scheduledOnly) {
@@ -116,7 +117,7 @@ class CheckStats
         $row = Snapshot::query()
             ->whereIn('address_id', $addressIds)
             ->selectRaw('COUNT(*) as checks_count')
-            ->selectRaw('AVG(response_time_ms) as avg_response_time_ms')
+            ->selectRaw($this->avgTimeSelectRaw($metric))
             ->selectRaw('SUM(CASE WHEN error_message IS NOT NULL AND error_message != \'\' THEN 1 ELSE 0 END) as error_count')
             ->first();
 
@@ -138,7 +139,7 @@ class CheckStats
 
         $runBuckets = $runBucketsQuery
             ->selectRaw($this->runGroupExpression().' as run_bucket')
-            ->selectRaw('AVG(response_time_ms) as avg_response_time_ms')
+            ->selectRaw($this->avgTimeSelectRaw($metric))
             ->selectRaw('SUM(CASE WHEN error_message IS NOT NULL AND error_message != \'\' THEN 1 ELSE 0 END) as error_count')
             ->groupBy('run_bucket')
             ->get();
@@ -155,11 +156,14 @@ class CheckStats
         $avgLatestResponseTimeMs = null;
 
         if ($latestChecksCount > 0) {
-            $avgLatestResponseTimeMs = (int) round(
-                (float) Snapshot::query()
-                    ->whereIn('id', $latestSnapshotIds)
-                    ->avg('response_time_ms')
-            );
+            $latestAvg = Snapshot::query()
+                ->whereIn('id', $latestSnapshotIds)
+                ->selectRaw($this->avgTimeSelectRaw($metric))
+                ->value('avg_response_time_ms');
+
+            $avgLatestResponseTimeMs = $latestAvg === null
+                ? null
+                : (int) round((float) $latestAvg);
         }
 
         return array_merge($base, [
@@ -167,9 +171,9 @@ class CheckStats
             'avg_errors_per_run' => $runsCount > 0
                 ? round((float) $runBuckets->avg('error_count'), 2)
                 : null,
-            'avg_response_time_per_run_ms' => $runsCount > 0
-                ? (int) round((float) $runBuckets->avg('avg_response_time_ms'))
-                : null,
+            'avg_response_time_per_run_ms' => $this->averageFromValues(
+                $runBuckets->pluck('avg_response_time_ms')
+            ),
             'avg_latest_response_time_ms' => $avgLatestResponseTimeMs,
             'latest_checks_count' => $latestChecksCount,
         ]);
@@ -225,7 +229,7 @@ class CheckStats
      *     avg_errors: float|null
      * }>
      */
-    public function forAddresses(Collection $addresses): array
+    public function forAddresses(Collection $addresses, ResponseTimeMetric $metric = ResponseTimeMetric::Total): array
     {
         if ($addresses->isEmpty()) {
             return [];
@@ -235,7 +239,7 @@ class CheckStats
             ->whereIn('address_id', $addresses->pluck('id'))
             ->selectRaw('address_id')
             ->selectRaw('COUNT(*) as checks_count')
-            ->selectRaw('AVG(response_time_ms) as avg_response_time_ms')
+            ->selectRaw($this->avgTimeSelectRaw($metric))
             ->selectRaw('SUM(CASE WHEN error_message IS NOT NULL AND error_message != \'\' THEN 1 ELSE 0 END) as error_count')
             ->groupBy('address_id')
             ->get()
@@ -275,7 +279,7 @@ class CheckStats
      *     mode: 'site'|'address'
      * }
      */
-    public function responseTimeChartForSite(Site $site, ?string $period = null): array
+    public function responseTimeChartForSite(Site $site, ?string $period = null, ResponseTimeMetric $metric = ResponseTimeMetric::Total): array
     {
         $site->loadMissing('addresses');
 
@@ -283,8 +287,9 @@ class CheckStats
             addressIds: $site->addresses->pluck('id'),
             period: $period,
             averageAcrossAddresses: true,
-            seriesLabel: 'Середнє по всіх адресах',
+            seriesLabel: $metric->chartSiteSeriesLabel(),
             mode: 'site',
+            metric: $metric,
         );
     }
 
@@ -305,7 +310,7 @@ class CheckStats
      *     mode: 'site'|'address'
      * }
      */
-    public function responseTimeChartForAddress(Address $address, ?string $period = null): array
+    public function responseTimeChartForAddress(Address $address, ?string $period = null, ResponseTimeMetric $metric = ResponseTimeMetric::Total): array
     {
         return $this->responseTimeSeries(
             addressIds: [$address->id],
@@ -313,6 +318,7 @@ class CheckStats
             averageAcrossAddresses: false,
             seriesLabel: $address->name ?: $address->endpoint,
             mode: 'address',
+            metric: $metric,
         );
     }
 
@@ -338,6 +344,7 @@ class CheckStats
         bool $averageAcrossAddresses,
         string $seriesLabel,
         string $mode,
+        ResponseTimeMetric $metric = ResponseTimeMetric::Total,
     ): array {
         $periodKey = $this->normalizePeriod($period);
         $hours = self::RESPONSE_TIME_PERIODS[$periodKey]['hours'];
@@ -371,7 +378,7 @@ class CheckStats
                 ->where('created_at', '>=', $from)
                 ->selectRaw($this->runGroupExpression().' as bucket')
                 ->selectRaw('MIN(created_at) as bucket_at')
-                ->selectRaw('AVG(response_time_ms) as avg_response_time_ms')
+                ->selectRaw($this->avgTimeSelectRaw($metric))
                 ->selectRaw('COUNT(*) as checks_count')
                 ->groupBy('bucket')
                 ->orderBy('bucket_at')
@@ -384,6 +391,10 @@ class CheckStats
             $checksCount = 0;
 
             foreach ($rows as $row) {
+                if ($row->avg_response_time_ms === null) {
+                    continue;
+                }
+
                 $avg = (int) round((float) $row->avg_response_time_ms);
                 $count = (int) $row->checks_count;
                 $labels[] = $this->formatBucketAtLabel($row->bucket_at);
@@ -397,7 +408,7 @@ class CheckStats
                 ->whereIn('address_id', $addressIds)
                 ->where('created_at', '>=', $from)
                 ->orderBy('created_at')
-                ->get(['response_time_ms', 'created_at']);
+                ->get(['response_time_ms', 'timing', 'created_at']);
 
             $labels = [];
             $values = [];
@@ -406,7 +417,11 @@ class CheckStats
             $checksCount = 0;
 
             foreach ($snapshots as $snapshot) {
-                $value = (int) $snapshot->response_time_ms;
+                $value = $snapshot->timeMs($metric);
+                if ($value === null) {
+                    continue;
+                }
+
                 $labels[] = $snapshot->created_at?->format('d.m H:i') ?? '';
                 $values[] = $value;
                 $counts[] = 1;
@@ -480,10 +495,66 @@ class CheckStats
 
         return [
             'checks_count' => $checksCount,
-            'avg_response_time_ms' => (int) round((float) $row->avg_response_time_ms),
+            'avg_response_time_ms' => $this->nullableRoundedAvg($row->avg_response_time_ms ?? null),
             'error_count' => $errorCount,
             'avg_errors' => round($errorCount / $checksCount, 2),
         ];
+    }
+
+    /**
+     * @param  Collection<int, Snapshot>  $snapshots
+     */
+    private function averageTimeMs(Collection $snapshots, ResponseTimeMetric $metric): ?int
+    {
+        $times = $snapshots
+            ->map(fn (Snapshot $snapshot) => $snapshot->timeMs($metric))
+            ->filter(fn (?int $value) => $value !== null);
+
+        if ($times->isEmpty()) {
+            return null;
+        }
+
+        return (int) round((float) $times->avg());
+    }
+
+    private function nullableRoundedAvg(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return (int) round((float) $value);
+    }
+
+    private function averageFromValues(Collection $values): ?int
+    {
+        $numeric = $values->filter(fn (mixed $value) => $value !== null && $value !== '');
+
+        if ($numeric->isEmpty()) {
+            return null;
+        }
+
+        return (int) round((float) $numeric->avg());
+    }
+
+    private function avgTimeSelectRaw(ResponseTimeMetric $metric): string
+    {
+        return 'AVG('.$this->timeExpression($metric).') as avg_response_time_ms';
+    }
+
+    private function timeExpression(ResponseTimeMetric $metric): string
+    {
+        if ($metric === ResponseTimeMetric::Total) {
+            return 'response_time_ms';
+        }
+
+        $driver = DB::connection()->getDriverName();
+
+        return match ($driver) {
+            'sqlite' => "CAST(json_extract(timing, '$.ttfb_ms') AS INTEGER)",
+            'pgsql' => "(timing->>'ttfb_ms')::int",
+            default => "CAST(JSON_UNQUOTE(JSON_EXTRACT(timing, '$.ttfb_ms')) AS UNSIGNED)",
+        };
     }
 
     /**

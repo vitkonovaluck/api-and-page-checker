@@ -21,6 +21,8 @@ class SiteSettingsModal extends Component
 
     public ?string $schedule_interval = null;
 
+    public int $requestsPerMinute = Site::CHECKS_PER_MINUTE_DEFAULT;
+
     /** @var list<int> */
     public array $address_schedule = [];
 
@@ -59,6 +61,12 @@ class SiteSettingsModal extends Component
             ],
             'address_schedule' => ['nullable', 'array'],
             'address_schedule.*' => ['integer'],
+            'requestsPerMinute' => [
+                'required',
+                'integer',
+                'min:'.Site::CHECKS_PER_MINUTE_MIN,
+                'max:'.Site::CHECKS_PER_MINUTE_MAX,
+            ],
         ]);
 
         $this->site->fill([
@@ -68,6 +76,7 @@ class SiteSettingsModal extends Component
             'schedule_interval' => $this->schedule_enabled
                 ? ($validated['schedule_interval'] ?? null)
                 : $this->site->schedule_interval,
+            'requests_per_minute' => (int) $validated['requestsPerMinute'],
         ])->save();
 
         $enabledIds = collect($validated['address_schedule'] ?? [])
@@ -116,11 +125,27 @@ class SiteSettingsModal extends Component
         $this->base_url = $this->site->base_url;
         $this->schedule_enabled = (bool) $this->site->schedule_enabled;
         $this->schedule_interval = $this->site->schedule_interval;
+        $this->requestsPerMinute = $this->resolvedRequestsPerMinute();
         $this->address_schedule = $this->site->addresses
             ->where('schedule_enabled', true)
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->values()
             ->all();
+    }
+
+    private function resolvedRequestsPerMinute(): int
+    {
+        if ($this->site->requests_per_minute !== null) {
+            return max(Site::CHECKS_PER_MINUTE_MIN, (int) $this->site->requests_per_minute);
+        }
+
+        $fallback = (int) config('checking.requests_per_minute', Site::CHECKS_PER_MINUTE_DEFAULT);
+
+        if ($fallback < Site::CHECKS_PER_MINUTE_MIN) {
+            return Site::CHECKS_PER_MINUTE_DEFAULT;
+        }
+
+        return min(Site::CHECKS_PER_MINUTE_MAX, $fallback);
     }
 }

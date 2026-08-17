@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Unit;
 
 use App\Jobs\CheckAddressJob;
@@ -9,6 +11,7 @@ use App\Services\SnapshotChecker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Mockery;
 use Tests\TestCase;
 
@@ -36,6 +39,76 @@ class CheckAddressJobTest extends TestCase
 
         $this->assertSame(1, $address->snapshots()->count());
         $this->assertNotNull($address->fresh()->last_checked_at);
+    }
+
+    public function test_job_retries_too_many_requests_before_saving_snapshot(): void
+    {
+        // Arrange
+        Sleep::fake();
+        config([
+            'checking.delay_seconds' => 0,
+            'checking.too_many_requests_retries' => 3,
+            'checking.too_many_requests_backoff_ms' => 1,
+        ]);
+
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/page',
+            'schedule_enabled' => true,
+        ]);
+
+        Http::fake([
+            'https://api.example.com/page' => Http::sequence()
+                ->push('Too Many Requests', 429)
+                ->push(['ok' => true], 200),
+        ]);
+
+        // Act
+        (new CheckAddressJob($address))->handle(app(SnapshotChecker::class));
+
+        // Assert
+        $snapshot = $address->snapshots()->first();
+        $this->assertNotNull($snapshot);
+        $this->assertSame(1, $address->snapshots()->count());
+        $this->assertSame(200, $snapshot->status_code);
+    }
+
+    public function test_job_spaces_checks_using_site_requests_per_minute(): void
+    {
+        // Arrange
+        Sleep::fake();
+        config([
+            'checking.delay_seconds' => 0,
+            'checking.requests_per_minute' => 0,
+        ]);
+
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+            'requests_per_minute' => 120,
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/health',
+        ]);
+
+        Http::fake([
+            'https://api.example.com/health' => Http::response(['ok' => true], 200),
+        ]);
+
+        $checker = app(SnapshotChecker::class);
+
+        // Act
+        (new CheckAddressJob($address))->handle($checker);
+        (new CheckAddressJob($address))->handle($checker);
+
+        // Assert
+        Sleep::assertSleptTimes(1);
+        $this->assertSame(2, $address->snapshots()->count());
     }
 
     public function test_job_uses_rate_limited_middleware(): void

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Addresses;
 
+use App\Livewire\Concerns\InteractsWithResponseTimeMetric;
 use App\Models\Address;
 use App\Models\Site;
 use App\Models\Snapshot;
@@ -13,6 +14,7 @@ use Livewire\WithPagination;
 
 class Show extends Component
 {
+    use InteractsWithResponseTimeMetric;
     use WithPagination;
 
     public Site $site;
@@ -28,6 +30,7 @@ class Show extends Component
         $this->site = $site;
         $this->address = $address;
         $this->checksBusy = $guard->isBusy();
+        $this->hydrateResponseTimeMetric();
     }
 
     public function deleteSnapshot(int $snapshotId): void
@@ -61,7 +64,8 @@ class Show extends Component
 
         $previous = $latest?->previous();
         $diff = $latest ? $diffService->compare($previous, $latest) : null;
-        $stats = $checkStats->forAddress($this->address);
+        $metric = $this->responseTimeMetric();
+        $stats = $checkStats->forAddress($this->address, $metric);
 
         $snapshots = Snapshot::query()
             ->where('address_id', $this->address->id)
@@ -71,6 +75,7 @@ class Show extends Component
                 'address_id',
                 'status_code',
                 'response_time_ms',
+                'timing',
                 'error_message',
                 'created_at',
             ])
@@ -81,6 +86,7 @@ class Show extends Component
             'latest' => $latest,
             'diff' => $diff,
             'stats' => $stats,
+            'metricEnum' => $metric,
         ])->title(($this->address->name ?: $this->address->endpoint).' — API Snapshot Checker');
     }
 }

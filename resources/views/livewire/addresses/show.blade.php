@@ -29,6 +29,7 @@
                     @include('partials.icons.cog')
                     Налаштування
                 </button>
+                @include('partials.response-time-metric-toggle')
                 <button
                     type="button"
                     wire:click="$dispatch('open-response-time-chart')"
@@ -71,8 +72,8 @@
                     <dd class="mt-1 font-medium">{{ $latest->status_code ?? '—' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-xs uppercase tracking-wide text-slate-500">Час відповіді</dt>
-                    <dd class="mt-1 font-medium">{{ $latest->response_time_ms }} ms</dd>
+                    <dt class="text-xs uppercase tracking-wide text-slate-500">{{ $metricEnum->snapshotTimeLabel() }}</dt>
+                    <dd class="mt-1 font-medium">{{ $latest->formattedTimeMs($metricEnum) }}</dd>
                 </div>
             </dl>
             @include('partials.timing', ['timing' => $latest->timing])
@@ -97,8 +98,8 @@
             @if (($stats['checks_count'] ?? 0) > 0)
                 <dl class="mt-3 grid gap-3 sm:grid-cols-3">
                     <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                        <dt class="text-xs uppercase tracking-wide text-slate-500">Середній час</dt>
-                        <dd class="mt-0.5 text-sm font-semibold text-slate-900">{{ $stats['avg_response_time_ms'] }} ms</dd>
+                        <dt class="text-xs uppercase tracking-wide text-slate-500">{{ $metricEnum->historyAverageLabel() }}</dt>
+                        <dd class="mt-0.5 text-sm font-semibold text-slate-900">{{ $stats['avg_response_time_ms'] !== null ? $stats['avg_response_time_ms'].' ms' : '—' }}</dd>
                     </div>
                     <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                         <dt class="text-xs uppercase tracking-wide text-slate-500">Середня к-сть помилок</dt>
@@ -122,7 +123,7 @@
                             <th class="px-5 py-3">#</th>
                             <th class="px-5 py-3">Дата</th>
                             <th class="px-5 py-3">Статус</th>
-                            <th class="px-5 py-3">Час відповіді</th>
+                            <th class="px-5 py-3">{{ $metricEnum->columnLabel() }}</th>
                             <th class="px-5 py-3">Результат</th>
                             <th class="px-5 py-3 text-right">Дії</th>
                         </tr>
@@ -133,7 +134,7 @@
                                 <td class="px-5 py-3 font-mono text-xs text-slate-500">{{ $snapshot->id }}</td>
                                 <td class="px-5 py-3">{{ $snapshot->created_at->format('d.m.Y H:i:s') }}</td>
                                 <td class="px-5 py-3">{{ $snapshot->status_code ?? '—' }}</td>
-                                <td class="px-5 py-3">{{ $snapshot->response_time_ms }} ms</td>
+                                <td class="px-5 py-3">{{ $snapshot->formattedTimeMs($metricEnum) }}</td>
                                 <td class="px-5 py-3">
                                     @if ($snapshot->error_message)
                                         <span class="text-red-700">помилка</span>
