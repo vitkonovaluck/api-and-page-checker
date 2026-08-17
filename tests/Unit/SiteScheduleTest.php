@@ -81,4 +81,30 @@ class SiteScheduleTest extends TestCase
         $this->assertTrue($site->isDueForScheduledCheck(Carbon::parse('2026-08-07 10:15:00')));
         $this->assertTrue($site->isDueForScheduledCheck(Carbon::parse('2026-08-07 10:22:00')));
     }
+
+    public function test_checks_per_minute_uses_site_setting_when_set(): void
+    {
+        // Arrange
+        config(['checking.requests_per_minute' => 32]);
+        $site = new Site(['requests_per_minute' => 5]);
+
+        // Act
+        $limit = $site->checksPerMinute();
+
+        // Assert
+        $this->assertSame(5, $limit);
+    }
+
+    public function test_checks_per_minute_falls_back_to_config_when_unset(): void
+    {
+        // Arrange
+        config(['checking.requests_per_minute' => 0]);
+        $site = new Site(['requests_per_minute' => null]);
+
+        // Act
+        $limit = $site->checksPerMinute();
+
+        // Assert
+        $this->assertSame(0, $limit);
+    }
 }

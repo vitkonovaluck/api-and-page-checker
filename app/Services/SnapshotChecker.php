@@ -19,11 +19,14 @@ class SnapshotChecker
     {
         $previous = $address->snapshots()->orderByDesc('id')->first();
         $address->loadMissing('site');
+        $site = $address->site;
         $result = $this->fetcher->request(
             $address->http_method ?? 'GET',
             $address->fullUrl(),
             $address->request_headers ?? [],
             $address->supportsRequestBody() ? $address->request_body : null,
+            $site->checksPerMinute(),
+            'site-'.$site->id,
         );
 
         $snapshot = Snapshot::query()->create([

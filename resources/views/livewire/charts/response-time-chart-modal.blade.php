@@ -10,12 +10,14 @@
         <div class="flex max-h-[90vh] flex-col">
             <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
                 <div>
-                    <h2 class="text-base font-semibold text-slate-900">{{ $title }}</h2>
+                    <h2 class="text-base font-semibold text-slate-900">
+                        {{ $mode === 'site' ? $this->responseTimeMetric()->chartSiteTitle() : $this->responseTimeMetric()->chartTitle() }}
+                    </h2>
                     <p class="mt-0.5 text-sm text-slate-500">
                         @if ($mode === 'site')
-                            Середнє значення часу відповіді по всіх адресах за обраний період
+                            {{ $this->responseTimeMetric()->chartSiteDescription() }}
                         @else
-                            Час відповіді адреси за обраний період
+                            {{ $this->responseTimeMetric()->chartAddressDescription() }}
                         @endif
                     </p>
                 </div>
@@ -33,6 +35,11 @@
             </div>
 
             <div class="space-y-4 overflow-y-auto px-5 py-5">
+                <div>
+                    <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Метрика</p>
+                    @include('partials.response-time-metric-toggle')
+                </div>
+
                 @if (($this->chart['avg_response_time_ms'] ?? null) !== null)
                     <div class="inline-block rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
                         <div class="text-xs uppercase tracking-wide text-slate-500">Середнє за період</div>
@@ -83,7 +90,7 @@
                             'period_label' => $this->chart['period_label'] ?? '',
                         ];
                     @endphp
-                    <script type="application/json" id="{{ $chartId }}-data" wire:key="chart-data-{{ $period }}-{{ $this->chart['checks_count'] }}-{{ $this->chart['avg_response_time_ms'] }}-{{ implode('-', $this->chart['values'] ?? []) }}">
+                    <script type="application/json" id="{{ $chartId }}-data" wire:key="chart-data-{{ $period }}-{{ $metric }}-{{ $this->chart['checks_count'] }}-{{ $this->chart['avg_response_time_ms'] }}-{{ implode('-', $this->chart['values'] ?? []) }}">
                         {!! json_encode($chartPayload, JSON_UNESCAPED_UNICODE) !!}
                     </script>
                 @endif
@@ -139,6 +146,12 @@
         });
 
         $wire.$watch('period', () => {
+            if ($wire.show) {
+                queueMicrotask(() => requestAnimationFrame(renderChart));
+            }
+        });
+
+        $wire.$watch('metric', () => {
             if ($wire.show) {
                 queueMicrotask(() => requestAnimationFrame(renderChart));
             }

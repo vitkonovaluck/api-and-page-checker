@@ -1,4 +1,5 @@
 <?php
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -24,7 +25,21 @@ return [
     |
     | Maximum number of HTTP check requests per host per minute. Requests are
     | spaced evenly (≈60s / limit). Set to 0 to disable throttling.
+    | A per-site value in site settings overrides this default.
     |
     */
     'requests_per_minute' => (int) env('CHECK_REQUESTS_PER_MINUTE', 32),
+    /*
+    |--------------------------------------------------------------------------
+    | Retry after HTTP 429 Too Many Requests
+    |--------------------------------------------------------------------------
+    |
+    | Pages that fan out into several backend APIs often trip the target's
+    | limiter even when a single endpoint check is fine. Retry the same check
+    | before saving a snapshot. 1 = do not retry.
+    |
+    */
+    'too_many_requests_retries' => (int) env('CHECK_429_RETRIES', 3),
+    'too_many_requests_backoff_ms' => (int) env('CHECK_429_BACKOFF_MS', 2000),
+    'too_many_requests_max_wait_ms' => (int) env('CHECK_429_MAX_WAIT_MS', 10000),
 ];

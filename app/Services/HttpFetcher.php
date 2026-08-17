@@ -1,85 +1,53 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use GuzzleHttp\TransferStats;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Throwable;
 
 class HttpFetcher
 {
+    private const TOO_MANY_REQUESTS = 429;
+
+    private ?int $requestsPerMinute = null;
+
+    private string $throttleKey = '';
+
     /**
      * @param  array<string, string>  $headers
      */
-    public function request(string $method, string $url, array $headers = [], ?string $body = null): FetchResult
-    {
-        $this->throttleHost($url);
+    public function request(
+        string $method,
+        string $url,
+        array $headers = [],
+        ?string $body = null,
+        ?int $requestsPerMinute = null,
+        ?string $throttleKey = null,
+    ): FetchResult {
+        $this->requestsPerMinute = $requestsPerMinute;
+        $this->throttleKey = $throttleKey ?? '';
 
-        $method = strtoupper($method);
-        $started = hrtime(true);
-        /** @var array<string, int>|null $timing */
-        $timing = null;
+        $maxAttempts = max(1, (int) config('checking.too_many_requests_retries', 3));
+        $result = $this->attempt($method, $url, $headers, $body, throttle: true);
 
-        try {
-            $mergedHeaders = array_merge([
-                'Accept' => 'application/json, text/plain, */*',
-                'User-Agent' => 'API-Snapshot-Checker/1.0',
-                'ngrok-skip-browser-warning' => 'true',
-            ], $headers);
-
-            $hasBody = $body !== null && $body !== '';
-            if ($hasBody && ! $this->hasHeader($mergedHeaders, 'Content-Type')) {
-                $mergedHeaders['Content-Type'] = $this->guessContentType($body);
+        for ($attempt = 1; $attempt < $maxAttempts; $attempt++) {
+            if ($result->statusCode !== self::TOO_MANY_REQUESTS) {
+                return $result;
             }
 
-            $pending = Http::timeout(30)
-                ->connectTimeout(10)
-                ->withHeaders($mergedHeaders)
-                ->withOptions([
-                    'http_errors' => false,
-                    'on_stats' => function (TransferStats $stats) use (&$timing): void {
-                        $timing = $this->timingFromStats($stats);
-                    },
-                ]);
-
-            $options = [];
-            if ($hasBody) {
-                $options['body'] = $body;
-            }
-
-            $response = $pending->send($method, $url, $options);
-
-            $elapsedMs = (int) round((hrtime(true) - $started) / 1_000_000);
-
-            $responseHeaders = [];
-            foreach ($response->headers() as $name => $values) {
-                $responseHeaders[strtolower((string) $name)] = is_array($values)
-                    ? implode(', ', $values)
-                    : (string) $values;
-            }
-
-            return new FetchResult(
-                statusCode: $response->status(),
-                headers: $responseHeaders,
-                body: $response->body(),
-                responseTimeMs: max(0, $elapsedMs),
-                timing: $timing,
-            );
-        } catch (ConnectionException|RequestException|Throwable $e) {
-            $elapsedMs = (int) round((hrtime(true) - $started) / 1_000_000);
-
-            return new FetchResult(
-                statusCode: null,
-                headers: [],
-                body: '',
-                responseTimeMs: max(0, $elapsedMs),
-                errorMessage: $e->getMessage(),
-                timing: $timing,
-            );
+            $this->waitAfterTooManyRequests($url, $attempt, $result->headers);
+            $result = $this->attempt($method, $url, $headers, $body, throttle: false);
         }
+
+        return $result;
     }
 
     /**
@@ -93,27 +61,140 @@ class HttpFetcher
     }
 
     /**
-     * Space outbound checks so a single host stays within requests_per_minute.
+     * @param  array<string, string>  $headers
+     */
+    private function attempt(string $method, string $url, array $headers, ?string $body, bool $throttle): FetchResult
+    {
+        if ($throttle) {
+            $this->throttleHost($url);
+        }
+
+        return $this->performRequest($method, $url, $headers, $body);
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     */
+    private function performRequest(string $method, string $url, array $headers, ?string $body): FetchResult
+    {
+        $method = strtoupper($method);
+        $started = hrtime(true);
+        /** @var array<string, int>|null $timing */
+        $timing = null;
+
+        try {
+            $response = $this->send($method, $url, $headers, $body, $timing);
+
+            return $this->resultFromResponse($response, $started, $timing);
+        } catch (ConnectionException|RequestException|Throwable $e) {
+            return $this->resultFromException($e, $started, $timing);
+        }
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     * @param  array<string, int>|null  $timing
+     */
+    private function send(string $method, string $url, array $headers, ?string $body, ?array &$timing): Response
+    {
+        $mergedHeaders = array_merge([
+            'Accept' => 'application/json, text/plain, */*',
+            'User-Agent' => 'API-Snapshot-Checker/1.0',
+            'ngrok-skip-browser-warning' => 'true',
+        ], $headers);
+
+        $hasBody = $body !== null && $body !== '';
+        if ($hasBody && ! $this->hasHeader($mergedHeaders, 'Content-Type')) {
+            $mergedHeaders['Content-Type'] = $this->guessContentType($body);
+        }
+
+        $pending = Http::timeout(30)
+            ->connectTimeout(10)
+            ->withHeaders($mergedHeaders)
+            ->withOptions([
+                'http_errors' => false,
+                'on_stats' => function (TransferStats $stats) use (&$timing): void {
+                    $timing = $this->timingFromStats($stats);
+                },
+            ]);
+
+        $options = [];
+        if ($hasBody) {
+            $options['body'] = $body;
+        }
+
+        return $pending->send($method, $url, $options);
+    }
+
+    /**
+     * @param  array<string, int>|null  $timing
+     */
+    private function resultFromResponse(Response $response, int $started, ?array $timing): FetchResult
+    {
+        $responseHeaders = [];
+        foreach ($response->headers() as $name => $values) {
+            $responseHeaders[strtolower((string) $name)] = is_array($values)
+                ? implode(', ', $values)
+                : (string) $values;
+        }
+
+        return new FetchResult(
+            statusCode: $response->status(),
+            headers: $responseHeaders,
+            body: $response->body(),
+            responseTimeMs: $this->elapsedMs($started),
+            timing: $timing,
+        );
+    }
+
+    /**
+     * @param  array<string, int>|null  $timing
+     */
+    private function resultFromException(Throwable $e, int $started, ?array $timing): FetchResult
+    {
+        return new FetchResult(
+            statusCode: null,
+            headers: [],
+            body: '',
+            responseTimeMs: $this->elapsedMs($started),
+            errorMessage: $e->getMessage(),
+            timing: $timing,
+        );
+    }
+
+    private function elapsedMs(int $started): int
+    {
+        return max(0, (int) round((hrtime(true) - $started) / 1_000_000));
+    }
+
+    /**
+     * Space outbound checks so a site stays within its checks-per-minute limit.
      */
     private function throttleHost(string $url): void
     {
-        $maxPerMinute = (int) config('checking.requests_per_minute', 32);
+        $maxPerMinute = $this->requestsPerMinute ?? (int) config('checking.requests_per_minute', 32);
 
         if ($maxPerMinute <= 0) {
             return;
         }
 
-        $host = parse_url($url, PHP_URL_HOST);
-        if (! is_string($host) || $host === '') {
-            $host = 'unknown';
-        }
+        $key = $this->activeThrottleKey($url);
+        $lockSeconds = min(90, max(20, (int) ceil(60 / $maxPerMinute) + 15));
+        $lock = Cache::lock('http-fetcher:lock:'.$key, $lockSeconds);
 
-        $host = strtolower($host);
-        $key = 'http-fetcher:last-request:'.$host;
-        $minIntervalMs = (int) ceil(60_000 / $maxPerMinute);
+        $lock->block($lockSeconds, function () use ($key, $maxPerMinute): void {
+            $this->waitForHostSlot($key, $maxPerMinute);
+        });
+    }
+
+    private function waitForHostSlot(string $key, int $maxPerMinute): void
+    {
+        $penalty = max(1, (int) Cache::get($this->penaltyKey($key), 1));
+        $minIntervalMs = (int) ceil(60_000 / $maxPerMinute) * $penalty;
+        $cacheKey = 'http-fetcher:last-request:'.$key;
 
         $nowMs = (int) floor(microtime(true) * 1000);
-        $lastMs = Cache::get($key);
+        $lastMs = Cache::get($cacheKey);
 
         if ($lastMs !== null) {
             $waitMs = $minIntervalMs - ($nowMs - (int) $lastMs);
@@ -126,21 +207,85 @@ class HttpFetcher
             }
         }
 
-        Cache::put($key, $nowMs, 120);
+        Cache::put($cacheKey, $nowMs, 120);
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     */
+    private function waitAfterTooManyRequests(string $url, int $attempt, array $headers): void
+    {
+        $this->rememberTooManyRequests($url);
+
+        $backoffMs = max(1, (int) config('checking.too_many_requests_backoff_ms', 2000));
+        $maxWaitMs = max(1, (int) config('checking.too_many_requests_max_wait_ms', 10_000));
+        $fromHeader = $this->retryAfterMs($headers);
+        $exponential = $backoffMs * (2 ** ($attempt - 1));
+        $waitMs = min($fromHeader ?? $exponential, $maxWaitMs);
+
+        $this->sleepMs($waitMs);
+    }
+
+    private function rememberTooManyRequests(string $url): void
+    {
+        $key = $this->penaltyKey($this->activeThrottleKey($url));
+        $penalty = min(4, max(1, (int) Cache::get($key, 1)) * 2);
+
+        Cache::put($key, $penalty, 120);
+    }
+
+    private function activeThrottleKey(string $url): string
+    {
+        if ($this->throttleKey !== '') {
+            return $this->throttleKey;
+        }
+
+        return $this->hostFromUrl($url);
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     */
+    private function retryAfterMs(array $headers): ?int
+    {
+        $raw = trim((string) ($headers['retry-after'] ?? ''));
+
+        if ($raw === '') {
+            return null;
+        }
+
+        if (ctype_digit($raw)) {
+            return (int) $raw * 1000;
+        }
+
+        $timestamp = strtotime($raw);
+
+        if ($timestamp === false) {
+            return null;
+        }
+
+        return max(0, ($timestamp - time()) * 1000);
+    }
+
+    private function penaltyKey(string $key): string
+    {
+        return 'http-fetcher:penalty:'.$key;
+    }
+
+    private function hostFromUrl(string $url): string
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+
+        if (! is_string($host) || $host === '') {
+            return 'unknown';
+        }
+
+        return strtolower($host);
     }
 
     private function sleepMs(int $waitMs): void
     {
-        $seconds = intdiv($waitMs, 1000);
-        $micros = ($waitMs % 1000) * 1000;
-
-        if ($seconds > 0) {
-            sleep($seconds);
-        }
-
-        if ($micros > 0) {
-            usleep($micros);
-        }
+        Sleep::for($waitMs)->milliseconds();
     }
 
     /**
