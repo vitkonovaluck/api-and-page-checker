@@ -4,6 +4,12 @@
         <div class="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h1 class="text-2xl font-semibold text-slate-900">{{ $site->name }}</h1>
+                @if (in_array($site->id, $busySiteIds, true))
+                    <p class="mt-1 inline-flex items-center gap-1 text-sm font-medium text-emerald-800">
+                        @include('partials.icons.spinner', ['class' => 'h-3.5 w-3.5 animate-spin'])
+                        Перевіряється…
+                    </p>
+                @endif
                 <p class="mt-1 break-all font-mono text-sm text-slate-600">{{ $site->base_url }}</p>
                 <p class="mt-1 text-sm text-slate-600">
                     Адреси цього сайту ({{ $site->addresses->count() }})
@@ -57,7 +63,8 @@
                 </button>
                 <x-check-button
                     :action="route('sites.check', $site)"
-                    :busy="$checksBusy"
+                    :site-id="$site->id"
+                    :busy="in_array($site->id, $busySiteIds, true)"
                     :disabled="$site->addresses->isEmpty()"
                     label="Перевірити всі адреси"
                 />
@@ -286,7 +293,8 @@
                                     <div class="flex flex-nowrap justify-end gap-1.5">
                                         <x-check-button
                                             :action="route('addresses.check', [$site, $address])"
-                                            :busy="$checksBusy"
+                                            :site-id="$site->id"
+                                            :busy="in_array($site->id, $busySiteIds, true)"
                                             title="Перевірити"
                                         />
                                         <a

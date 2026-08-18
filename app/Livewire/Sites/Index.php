@@ -1,21 +1,27 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Sites;
 
 use App\Models\Site;
 use App\Services\CheckingGuard;
 use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
 #[Title('Список сайтів — API Snapshot Checker')]
 class Index extends Component
 {
-    public bool $checksBusy = false;
+    /**
+     * @var list<int>
+     */
+    public array $busySiteIds = [];
 
     public function mount(CheckingGuard $guard): void
     {
-        $this->checksBusy = $guard->isBusy();
+        $this->syncBusyState($guard);
     }
 
     public function copy(Site $site): void
@@ -61,12 +67,12 @@ class Index extends Component
 
     public function refreshData(CheckingGuard $guard): void
     {
-        $this->checksBusy = $guard->isBusy();
+        $this->syncBusyState($guard);
     }
 
-    public function render(CheckingGuard $guard)
+    public function render(CheckingGuard $guard): View
     {
-        $this->checksBusy = $guard->isBusy();
+        $this->syncBusyState($guard);
 
         $sites = Site::query()
             ->withCount('addresses')
@@ -75,5 +81,10 @@ class Index extends Component
             ->get();
 
         return view('livewire.sites.index', compact('sites'));
+    }
+
+    private function syncBusyState(CheckingGuard $guard): void
+    {
+        $this->busySiteIds = $guard->busySiteIds();
     }
 }

@@ -18,10 +18,14 @@ class CheckAddressJob implements ShouldQueue
 
     public int $timeout = 90;
 
+    public int $siteId;
+
     public function __construct(
         public Address $address,
         public ?int $checkRunId = null,
-    ) {}
+    ) {
+        $this->siteId = (int) $address->site_id;
+    }
 
     /**
      * @return list<object>

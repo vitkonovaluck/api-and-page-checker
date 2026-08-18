@@ -39,7 +39,8 @@
                 </button>
                 <x-check-button
                     :action="route('addresses.check', [$site, $address])"
-                    :busy="$checksBusy"
+                    :site-id="$site->id"
+                    :busy="in_array($site->id, $busySiteIds, true)"
                     label="Зробити знімок"
                 />
             </div>

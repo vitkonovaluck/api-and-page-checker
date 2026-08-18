@@ -38,12 +38,22 @@
                         @foreach ($sites as $site)
                             @php
                                 $lastChecked = $site->addresses->max('last_checked_at');
+                                $isChecking = in_array($site->id, $busySiteIds, true);
                             @endphp
-                            <tr class="align-top hover:bg-slate-50/80" wire:key="site-{{ $site->id }}">
+                            <tr
+                                class="align-top hover:bg-slate-50/80 {{ $isChecking ? 'bg-emerald-50 hover:bg-emerald-50' : '' }}"
+                                wire:key="site-{{ $site->id }}"
+                            >
                                 <td class="px-5 py-4">
                                     <a href="{{ route('sites.show', $site) }}" wire:navigate class="font-medium text-slate-900 hover:underline">
                                         {{ $site->name }}
                                     </a>
+                                    @if ($isChecking)
+                                        <div class="mt-1 inline-flex items-center gap-1 text-xs font-medium text-emerald-800">
+                                            @include('partials.icons.spinner', ['class' => 'h-3 w-3 animate-spin'])
+                                            Перевіряється…
+                                        </div>
+                                    @endif
                                     @if ($site->schedule_enabled)
                                         <div class="mt-1 text-xs text-emerald-700">розклад: {{ \App\Models\Site::SCHEDULE_INTERVAL_LABELS[$site->schedule_interval] ?? $site->schedule_interval }}</div>
                                     @endif
@@ -57,7 +67,8 @@
                                     <div class="flex flex-wrap justify-end gap-1.5">
                                         <x-check-button
                                             :action="route('sites.check', $site)"
-                                            :busy="$checksBusy"
+                                            :site-id="$site->id"
+                                            :busy="$isChecking"
                                             :disabled="$site->addresses_count === 0"
                                             title="Перевірити сайт"
                                         />
