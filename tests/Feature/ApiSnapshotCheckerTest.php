@@ -10,6 +10,7 @@ use App\Livewire\Charts\ResponseTimeChartModal;
 use App\Livewire\Sites\AddressListModal;
 use App\Livewire\Sites\CreateSiteModal;
 use App\Livewire\Sites\ErrorSnapshotsModal;
+use App\Livewire\Sites\Index as SitesIndex;
 use App\Livewire\Sites\Show;
 use App\Livewire\Sites\SiteSettingsModal;
 use App\Models\Address;
@@ -155,6 +156,7 @@ class ApiSnapshotCheckerTest extends TestCase
             ->assertSessionHas('success', 'Перевірку 2 адрес поставлено в чергу.');
 
         Queue::assertPushed(CheckAddressJob::class, 2);
+        Queue::assertPushedOn(Site::checkQueueName($site->id), CheckAddressJob::class);
         Queue::assertPushed(CheckAddressJob::class, function (CheckAddressJob $job) use ($a1) {
             return $job->address->is($a1) && $job->checkRunId !== null;
         });
@@ -172,7 +174,7 @@ class ApiSnapshotCheckerTest extends TestCase
             'endpoint' => '/data',
         ]);
 
-        Cache::put(CheckingGuard::MANUAL_KEY, true, 60);
+        Cache::put(CheckingGuard::manualKey($site->id), true, 60);
 
         Http::fake([
             'https://api.example.com/data' => Http::response(['ok' => true], 200),
@@ -189,7 +191,6 @@ class ApiSnapshotCheckerTest extends TestCase
     public function test_scheduled_command_skips_when_manual_check_is_running(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-08-07 10:15:00'));
-        Cache::put(CheckingGuard::MANUAL_KEY, true, 60);
         Queue::fake();
 
         $site = Site::query()->create([
@@ -204,12 +205,94 @@ class ApiSnapshotCheckerTest extends TestCase
             'schedule_enabled' => true,
         ]);
 
+        Cache::put(CheckingGuard::manualKey($site->id), true, 60);
+
         Artisan::call('sites:run-scheduled');
 
         Queue::assertNothingPushed();
         $this->assertNull($site->fresh()->schedule_last_run_at);
 
         Carbon::setTestNow();
+    }
+
+    public function test_index_marks_only_the_site_with_pending_checks_as_busy(): void
+    {
+        config(['queue.default' => 'database']);
+
+        $busySite = Site::query()->create([
+            'name' => 'Busy Shop',
+            'base_url' => 'https://busy.example.com',
+        ]);
+        $idleSite = Site::query()->create([
+            'name' => 'Idle Shop',
+            'base_url' => 'https://idle.example.com',
+        ]);
+        $busyAddress = Address::query()->create([
+            'site_id' => $busySite->id,
+            'endpoint' => '/health',
+        ]);
+        Address::query()->create([
+            'site_id' => $idleSite->id,
+            'endpoint' => '/health',
+        ]);
+
+        CheckAddressJob::dispatch($busyAddress);
+
+        Livewire::test(SitesIndex::class)
+            ->assertSet('busySiteIds', [$busySite->id])
+            ->assertSee('Busy Shop')
+            ->assertSee('Перевіряється…')
+            ->assertSee('Idle Shop');
+    }
+
+    public function test_manual_check_of_another_site_is_allowed_while_jobs_are_pending(): void
+    {
+        config(['queue.default' => 'database']);
+
+        $busySite = Site::query()->create([
+            'name' => 'Busy',
+            'base_url' => 'https://busy.example.com',
+        ]);
+        $idleSite = Site::query()->create([
+            'name' => 'Idle',
+            'base_url' => 'https://idle.example.com',
+        ]);
+        Address::query()->create([
+            'site_id' => $busySite->id,
+            'endpoint' => '/one',
+        ]);
+        Address::query()->create([
+            'site_id' => $idleSite->id,
+            'endpoint' => '/two',
+        ]);
+
+        CheckAddressJob::dispatch($busySite->addresses()->first());
+
+        $this->from(route('sites.index'))
+            ->post("/sites/{$idleSite->id}/check")
+            ->assertRedirect("/sites/{$idleSite->id}")
+            ->assertSessionHas('success', 'Перевірку 1 адрес поставлено в чергу.');
+    }
+
+    public function test_manual_check_of_same_site_is_blocked_while_jobs_are_pending(): void
+    {
+        config(['queue.default' => 'database']);
+
+        $site = Site::query()->create([
+            'name' => 'Busy',
+            'base_url' => 'https://busy.example.com',
+        ]);
+        Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/one',
+        ]);
+
+        CheckAddressJob::dispatch($site->addresses()->first());
+
+        $this->from(route('sites.index'))
+            ->post("/sites/{$site->id}/check")
+            ->assertRedirect(route('sites.index'))
+            ->assertSessionHas('error');
     }
 
     public function test_check_all_with_no_addresses_shows_message(): void
@@ -834,6 +917,7 @@ class ApiSnapshotCheckerTest extends TestCase
         Artisan::call('sites:run-scheduled');
 
         Queue::assertPushed(CheckAddressJob::class, 1);
+        Queue::assertPushedOn(Site::checkQueueName($site->id), CheckAddressJob::class);
         Queue::assertPushed(CheckAddressJob::class, function (CheckAddressJob $job) use ($included) {
             return $job->address->is($included) && $job->checkRunId !== null;
         });

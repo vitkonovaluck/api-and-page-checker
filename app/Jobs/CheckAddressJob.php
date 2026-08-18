@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\Address;
+use App\Models\Site;
 use App\Services\SnapshotChecker;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -18,10 +19,15 @@ class CheckAddressJob implements ShouldQueue
 
     public int $timeout = 90;
 
+    public int $siteId;
+
     public function __construct(
         public Address $address,
         public ?int $checkRunId = null,
-    ) {}
+    ) {
+        $this->siteId = (int) $address->site_id;
+        $this->onQueue(Site::checkQueueName($this->siteId));
+    }
 
     /**
      * @return list<object>
