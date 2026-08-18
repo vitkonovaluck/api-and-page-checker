@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Sites;
 
 use App\Livewire\Concerns\InteractsWithResponseTimeMetric;
@@ -7,7 +9,7 @@ use App\Models\Address;
 use App\Models\Site;
 use App\Services\CheckingGuard;
 use App\Services\CheckStats;
-use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 use Livewire\Component;
 
 class Show extends Component
@@ -16,46 +18,16 @@ class Show extends Component
 
     public Site $site;
 
-    public bool $checksBusy = false;
+    /**
+     * @var list<int>
+     */
+    public array $busySiteIds = [];
 
     public function mount(Site $site, CheckingGuard $guard): void
     {
         $this->site = $site;
-        $this->checksBusy = $guard->isBusy();
+        $this->syncBusyState($guard);
         $this->hydrateResponseTimeMetric();
-    }
-
-    public function copy(): void
-    {
-        $this->site->load('addresses');
-
-        $copy = DB::transaction(function () {
-            $newSite = Site::query()->create([
-                'name' => $this->site->name.' (копія)',
-                'base_url' => $this->site->base_url,
-                'schedule_enabled' => $this->site->schedule_enabled,
-                'schedule_interval' => $this->site->schedule_interval,
-                'schedule_last_run_at' => null,
-                'requests_per_minute' => $this->site->requests_per_minute,
-            ]);
-
-            foreach ($this->site->addresses as $address) {
-                $newSite->addresses()->create([
-                    'name' => $address->name,
-                    'endpoint' => $address->endpoint,
-                    'http_method' => $address->http_method,
-                    'schedule_enabled' => $address->schedule_enabled,
-                    'request_headers' => $address->request_headers,
-                    'request_body' => $address->request_body,
-                    'last_checked_at' => null,
-                ]);
-            }
-
-            return $newSite;
-        });
-
-        session()->flash('success', 'Сайт скопійовано.');
-        $this->redirect(route('sites.show', $copy), navigate: true);
     }
 
     public function deleteAddress(int $addressId): void
@@ -73,12 +45,12 @@ class Show extends Component
     public function refreshData(CheckingGuard $guard): void
     {
         $this->site->refresh();
-        $this->checksBusy = $guard->isBusy();
+        $this->syncBusyState($guard);
     }
 
-    public function render(CheckStats $checkStats, CheckingGuard $guard)
+    public function render(CheckStats $checkStats, CheckingGuard $guard): View
     {
-        $this->checksBusy = $guard->isBusy();
+        $this->syncBusyState($guard);
         $this->site->load(['addresses' => fn ($q) => $q->with(['latestSnapshot', 'previousSnapshot'])->orderBy('id')]);
 
         $metric = $this->responseTimeMetric();
@@ -94,5 +66,10 @@ class Show extends Component
             'siteStats' => $siteStats,
             'metricEnum' => $metric,
         ])->title($this->site->name.' — API Snapshot Checker');
+    }
+
+    private function syncBusyState(CheckingGuard $guard): void
+    {
+        $this->busySiteIds = $guard->busySiteIds();
     }
 }

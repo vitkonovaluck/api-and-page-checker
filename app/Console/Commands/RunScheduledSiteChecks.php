@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Console\Commands;
 
 use App\Jobs\CheckAddressJob;
@@ -16,12 +18,6 @@ class RunScheduledSiteChecks extends Command
 
     public function handle(CheckingGuard $guard): int
     {
-        if ($guard->isBusy()) {
-            $this->warn('Skipping scheduled enqueue: a check is already in progress.');
-
-            return self::SUCCESS;
-        }
-
         $sites = Site::query()
             ->where('schedule_enabled', true)
             ->whereNotNull('schedule_interval')
@@ -32,6 +28,12 @@ class RunScheduledSiteChecks extends Command
         $queued = 0;
 
         foreach ($sites as $site) {
+            if ($guard->isBusy($site->id)) {
+                $this->warn("Skipping site #{$site->id}: a check is already in progress.");
+
+                continue;
+            }
+
             // Claim first so a second concurrent scheduler process skips this site.
             if (! $site->claimForScheduledCheck()) {
                 continue;

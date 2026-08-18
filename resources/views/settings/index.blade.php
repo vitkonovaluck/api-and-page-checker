@@ -5,10 +5,55 @@
 @section('content')
     <div class="mb-8">
         <h1 class="text-2xl font-semibold text-slate-900">Налаштування</h1>
-        <p class="mt-1 text-sm text-slate-600">Бекап і відновлення бази даних, службова інформація.</p>
+        <p class="mt-1 text-sm text-slate-600">Перенесення сайтів між серверами, бекап бази та службова інформація.</p>
     </div>
 
     <div class="grid gap-6 lg:grid-cols-2">
+        <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 class="mb-2 text-base font-semibold text-slate-900">Експорт сайтів</h2>
+            <p class="mb-4 text-sm text-slate-600">
+                Завантажити JSON з налаштуваннями всіх сайтів і адрес. Файл можна імпортувати на іншому сервері
+                (SQLite чи MySQL). Історія перевірок не входить — для повної копії бази скористайтесь бекапом нижче.
+            </p>
+            <form method="GET" action="{{ route('sites.export-all') }}">
+                <button
+                    type="submit"
+                    class="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                >
+                    @include('partials.icons.download')
+                    Завантажити JSON
+                </button>
+            </form>
+        </section>
+
+        <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 class="mb-2 text-base font-semibold text-slate-900">Імпорт сайтів</h2>
+            <p class="mb-4 text-sm text-slate-600">
+                Додає сайти з JSON-експорту. Поточні сайти не видаляються і не перезаписуються.
+            </p>
+            <form method="POST" action="{{ route('sites.import') }}" enctype="multipart/form-data" class="space-y-4">
+                @csrf
+                <div>
+                    <label for="sites-import-file" class="mb-1 block text-sm font-medium text-slate-700">Файл .json</label>
+                    <input
+                        type="file"
+                        name="file"
+                        id="sites-import-file"
+                        accept=".json,application/json"
+                        required
+                        class="block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-800"
+                    >
+                </div>
+                <button
+                    type="submit"
+                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                >
+                    @include('partials.icons.upload')
+                    Імпортувати
+                </button>
+            </form>
+        </section>
+
         <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 class="mb-2 text-base font-semibold text-slate-900">Бекап бази даних</h2>
             @if ($is_mysql)
@@ -92,12 +137,13 @@
             </p>
             <pre class="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-slate-950 p-4 text-xs text-slate-100"><code>* * * * * cd {{ base_path() }} &amp;&amp; php artisan schedule:run &gt;&gt; /dev/null 2&gt;&amp;1</code></pre>
             <p class="mt-3 text-sm text-slate-600">
-                Окремо тримайте воркер черги (один процес — щоб пауза ~1 с між перевірками давала ≈30/хв):
+                Окремо тримайте воркери черг: по одному процесу на кожен сайт (окремі черги, перевірки йдуть паралельно):
             </p>
-            <pre class="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-slate-950 p-4 text-xs text-slate-100"><code>php artisan queue:work --tries=3 --timeout=60</code></pre>
+            <pre class="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-slate-950 p-4 text-xs text-slate-100"><code>php artisan sites:queue-work</code></pre>
             <p class="mt-3 text-sm text-slate-600">
+                Переглянути черги без запуску: <span class="font-mono text-xs">php artisan sites:queue-work --pretend</span>.
                 Локально: <span class="font-mono text-xs">composer run dev</span> уже запускає
-                <span class="font-mono text-xs">queue:listen</span>, або вручну
+                <span class="font-mono text-xs">sites:queue-work --listen</span>, або вручну
                 <span class="font-mono text-xs">php artisan sites:run-scheduled</span> (лише enqueue).
                 Не запускайте одночасно cron <span class="font-mono text-xs">schedule:run</span> і окремий
                 <span class="font-mono text-xs">sites:run-scheduled</span> — буде подвійна постановка в чергу.

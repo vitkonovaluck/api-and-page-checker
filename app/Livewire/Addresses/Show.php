@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Addresses;
 
 use App\Livewire\Concerns\InteractsWithResponseTimeMetric;
@@ -9,6 +11,7 @@ use App\Models\Snapshot;
 use App\Services\CheckingGuard;
 use App\Services\CheckStats;
 use App\Services\DiffService;
+use Illuminate\View\View;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -21,7 +24,10 @@ class Show extends Component
 
     public Address $address;
 
-    public bool $checksBusy = false;
+    /**
+     * @var list<int>
+     */
+    public array $busySiteIds = [];
 
     public function mount(Site $site, Address $address, CheckingGuard $guard): void
     {
@@ -29,7 +35,7 @@ class Show extends Component
 
         $this->site = $site;
         $this->address = $address;
-        $this->checksBusy = $guard->isBusy();
+        $this->syncBusyState($guard);
         $this->hydrateResponseTimeMetric();
     }
 
@@ -49,12 +55,12 @@ class Show extends Component
     {
         $this->site->refresh();
         $this->address->refresh();
-        $this->checksBusy = $guard->isBusy();
+        $this->syncBusyState($guard);
     }
 
-    public function render(DiffService $diffService, CheckStats $checkStats, CheckingGuard $guard)
+    public function render(DiffService $diffService, CheckStats $checkStats, CheckingGuard $guard): View
     {
-        $this->checksBusy = $guard->isBusy();
+        $this->syncBusyState($guard);
         $this->address->setRelation('site', $this->site);
 
         $latest = Snapshot::query()
@@ -88,5 +94,10 @@ class Show extends Component
             'stats' => $stats,
             'metricEnum' => $metric,
         ])->title(($this->address->name ?: $this->address->endpoint).' — API Snapshot Checker');
+    }
+
+    private function syncBusyState(CheckingGuard $guard): void
+    {
+        $this->busySiteIds = $guard->busySiteIds();
     }
 }

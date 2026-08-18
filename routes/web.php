@@ -4,13 +4,17 @@ use App\Http\Controllers\AddressController;
 use App\Http\Controllers\CheckController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SiteController;
+use App\Http\Controllers\SiteTransferController;
 use App\Livewire\Addresses\Show as AddressShow;
 use App\Livewire\Sites\Index as SitesIndex;
 use App\Livewire\Sites\Show as SiteShow;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', SitesIndex::class)->name('sites.index');
+Route::get('/sites/export', [SiteTransferController::class, 'exportAll'])->name('sites.export-all');
+Route::post('/sites/import', [SiteTransferController::class, 'import'])->name('sites.import');
 Route::get('/sites/{site}', SiteShow::class)->name('sites.show');
+Route::get('/sites/{site}/export', [SiteTransferController::class, 'export'])->name('sites.export');
 Route::post('/sites/{site}/copy', [SiteController::class, 'copy'])->name('sites.copy');
 Route::delete('/sites/{site}', [SiteController::class, 'destroy'])->name('sites.destroy');
 Route::post('/sites/{site}/check', [CheckController::class, 'storeAll'])->name('sites.check');
