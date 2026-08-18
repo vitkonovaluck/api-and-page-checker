@@ -54,13 +54,6 @@
                 >
                     Додати адресу
                 </button>
-                <button
-                    type="button"
-                    wire:click="copy"
-                    class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
-                >
-                    Копіювати сайт
-                </button>
                 <x-check-button
                     :action="route('sites.check', $site)"
                     :site-id="$site->id"

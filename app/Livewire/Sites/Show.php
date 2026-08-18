@@ -9,7 +9,6 @@ use App\Models\Address;
 use App\Models\Site;
 use App\Services\CheckingGuard;
 use App\Services\CheckStats;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Livewire\Component;
 
@@ -29,39 +28,6 @@ class Show extends Component
         $this->site = $site;
         $this->syncBusyState($guard);
         $this->hydrateResponseTimeMetric();
-    }
-
-    public function copy(): void
-    {
-        $this->site->load('addresses');
-
-        $copy = DB::transaction(function () {
-            $newSite = Site::query()->create([
-                'name' => $this->site->name.' (копія)',
-                'base_url' => $this->site->base_url,
-                'schedule_enabled' => $this->site->schedule_enabled,
-                'schedule_interval' => $this->site->schedule_interval,
-                'schedule_last_run_at' => null,
-                'requests_per_minute' => $this->site->requests_per_minute,
-            ]);
-
-            foreach ($this->site->addresses as $address) {
-                $newSite->addresses()->create([
-                    'name' => $address->name,
-                    'endpoint' => $address->endpoint,
-                    'http_method' => $address->http_method,
-                    'schedule_enabled' => $address->schedule_enabled,
-                    'request_headers' => $address->request_headers,
-                    'request_body' => $address->request_body,
-                    'last_checked_at' => null,
-                ]);
-            }
-
-            return $newSite;
-        });
-
-        session()->flash('success', 'Сайт скопійовано.');
-        $this->redirect(route('sites.show', $copy), navigate: true);
     }
 
     public function deleteAddress(int $addressId): void

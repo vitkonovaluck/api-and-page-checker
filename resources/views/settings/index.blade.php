@@ -5,10 +5,86 @@
 @section('content')
     <div class="mb-8">
         <h1 class="text-2xl font-semibold text-slate-900">Налаштування</h1>
-        <p class="mt-1 text-sm text-slate-600">Бекап і відновлення бази даних, службова інформація.</p>
+        <p class="mt-1 text-sm text-slate-600">Перенесення сайтів між серверами, бекап бази та службова інформація.</p>
     </div>
 
     <div class="grid gap-6 lg:grid-cols-2">
+        <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 class="mb-2 text-base font-semibold text-slate-900">Експорт сайтів</h2>
+            <p class="mb-4 text-sm text-slate-600">
+                Завантажити JSON з налаштуваннями всіх сайтів і адрес. Файл можна імпортувати на іншому сервері
+                (SQLite чи MySQL). Історія перевірок не входить — для повної копії бази скористайтесь бекапом нижче.
+            </p>
+            <form method="GET" action="{{ route('sites.export-all') }}">
+                <button
+                    type="submit"
+                    class="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                >
+                    @include('partials.icons.download')
+                    Завантажити JSON
+                </button>
+            </form>
+        </section>
+
+        <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 class="mb-2 text-base font-semibold text-slate-900">Імпорт сайтів</h2>
+            <p class="mb-4 text-sm text-slate-600">
+                Додає сайти з JSON-експорту. Поточні сайти не видаляються і не перезаписуються.
+            </p>
+            <form method="POST" action="{{ route('sites.import') }}" enctype="multipart/form-data" class="space-y-4">
+                @csrf
+                <div>
+                    <label for="sites-import-file" class="mb-1 block text-sm font-medium text-slate-700">Файл .json</label>
+                    <input
+                        type="file"
+                        name="file"
+                        id="sites-import-file"
+                        accept=".json,application/json"
+                        required
+                        class="block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-800"
+                    >
+                </div>
+                <button
+                    type="submit"
+                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                >
+                    @include('partials.icons.upload')
+                    Імпортувати
+                </button>
+            </form>
+        </section>
+
+        <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
+            <h2 class="mb-2 text-base font-semibold text-slate-900">Копіювати сайт</h2>
+            <p class="mb-4 text-sm text-slate-600">
+                Створює дублікат сайту з адресами. Історія перевірок не копіюється.
+            </p>
+            @if ($sites->isEmpty())
+                <p class="text-sm text-slate-500">Поки немає сайтів.</p>
+            @else
+                <ul class="divide-y divide-slate-100 rounded-lg border border-slate-200">
+                    @foreach ($sites as $site)
+                        <li class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <p class="font-medium text-slate-900">{{ $site->name }}</p>
+                                <p class="break-all font-mono text-xs text-slate-500">{{ $site->base_url }}</p>
+                            </div>
+                            <form method="POST" action="{{ route('sites.copy', $site) }}">
+                                @csrf
+                                <button
+                                    type="submit"
+                                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                                >
+                                    @include('partials.icons.copy')
+                                    Копіювати
+                                </button>
+                            </form>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </section>
+
         <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 class="mb-2 text-base font-semibold text-slate-900">Бекап бази даних</h2>
             @if ($is_mysql)

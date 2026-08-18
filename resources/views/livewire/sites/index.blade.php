@@ -83,15 +83,6 @@
                                         </a>
                                         <button
                                             type="button"
-                                            wire:click="copy({{ $site->id }})"
-                                            title="Копіювати сайт"
-                                            aria-label="Копіювати сайт"
-                                            class="inline-flex items-center justify-center rounded-lg border border-slate-300 p-2 text-slate-700 hover:bg-slate-100"
-                                        >
-                                            @include('partials.icons.copy')
-                                        </button>
-                                        <button
-                                            type="button"
                                             wire:click="delete({{ $site->id }})"
                                             wire:confirm="Видалити сайт, усі адреси і знімки?"
                                             title="Видалити"

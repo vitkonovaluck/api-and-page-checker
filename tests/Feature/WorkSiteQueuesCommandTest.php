@@ -66,4 +66,13 @@ class WorkSiteQueuesCommandTest extends TestCase
             ->assertOk()
             ->assertSee('sites:queue-work');
     }
+
+    public function test_docker_queue_service_runs_per_site_workers(): void
+    {
+        $compose = file_get_contents(base_path('docker-compose.yml'));
+
+        $this->assertNotFalse($compose);
+        $this->assertStringContainsString('sites:queue-work', $compose);
+        $this->assertDoesNotMatchRegularExpression('/artisan", "queue:work"/', $compose);
+    }
 }

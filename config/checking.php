@@ -53,4 +53,18 @@ return [
     */
     'queue_prefix' => env('CHECK_QUEUE_PREFIX', 'site'),
     'worker_scan_seconds' => (int) env('CHECK_WORKER_SCAN_SECONDS', 5),
+    /*
+    |--------------------------------------------------------------------------
+    | Portable site transfer (JSON import/export)
+    |--------------------------------------------------------------------------
+    |
+    | Used to move site configuration and addresses between servers without
+    | replacing the whole database. Check history (snapshots) is not included.
+    |
+    */
+    'transfer' => [
+        'format' => 'api-checker-sites',
+        'version' => 1,
+        'max_upload_kb' => (int) env('SITE_TRANSFER_MAX_UPLOAD_KB', 10240),
+    ],
 ];
