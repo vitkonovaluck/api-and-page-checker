@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Carbon\CarbonInterface;
@@ -58,6 +60,18 @@ class Site extends Model
         }
 
         return (int) config('checking.requests_per_minute', self::CHECKS_PER_MINUTE_DEFAULT);
+    }
+
+    public static function checkQueueName(int $siteId): string
+    {
+        $prefix = (string) config('checking.queue_prefix', 'site');
+
+        return $prefix.'-'.$siteId;
+    }
+
+    public function checkQueue(): string
+    {
+        return self::checkQueueName((int) $this->id);
     }
 
     public function addresses(): HasMany

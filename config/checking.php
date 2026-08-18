@@ -42,4 +42,15 @@ return [
     'too_many_requests_retries' => (int) env('CHECK_429_RETRIES', 3),
     'too_many_requests_backoff_ms' => (int) env('CHECK_429_BACKOFF_MS', 2000),
     'too_many_requests_max_wait_ms' => (int) env('CHECK_429_MAX_WAIT_MS', 10000),
+    /*
+    |--------------------------------------------------------------------------
+    | Per-site check queues
+    |--------------------------------------------------------------------------
+    |
+    | Each site is dispatched onto "{prefix}-{id}" and sites:queue-work starts
+    | one worker process per site so checks run in parallel across sites.
+    |
+    */
+    'queue_prefix' => env('CHECK_QUEUE_PREFIX', 'site'),
+    'worker_scan_seconds' => (int) env('CHECK_WORKER_SCAN_SECONDS', 5),
 ];

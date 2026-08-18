@@ -156,6 +156,7 @@ class ApiSnapshotCheckerTest extends TestCase
             ->assertSessionHas('success', 'Перевірку 2 адрес поставлено в чергу.');
 
         Queue::assertPushed(CheckAddressJob::class, 2);
+        Queue::assertPushedOn(Site::checkQueueName($site->id), CheckAddressJob::class);
         Queue::assertPushed(CheckAddressJob::class, function (CheckAddressJob $job) use ($a1) {
             return $job->address->is($a1) && $job->checkRunId !== null;
         });
@@ -916,6 +917,7 @@ class ApiSnapshotCheckerTest extends TestCase
         Artisan::call('sites:run-scheduled');
 
         Queue::assertPushed(CheckAddressJob::class, 1);
+        Queue::assertPushedOn(Site::checkQueueName($site->id), CheckAddressJob::class);
         Queue::assertPushed(CheckAddressJob::class, function (CheckAddressJob $job) use ($included) {
             return $job->address->is($included) && $job->checkRunId !== null;
         });

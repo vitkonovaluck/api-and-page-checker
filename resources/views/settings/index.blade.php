@@ -92,12 +92,13 @@
             </p>
             <pre class="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-slate-950 p-4 text-xs text-slate-100"><code>* * * * * cd {{ base_path() }} &amp;&amp; php artisan schedule:run &gt;&gt; /dev/null 2&gt;&amp;1</code></pre>
             <p class="mt-3 text-sm text-slate-600">
-                Окремо тримайте воркер черги (один процес — щоб пауза ~1 с між перевірками давала ≈30/хв):
+                Окремо тримайте воркери черг: по одному процесу на кожен сайт (окремі черги, перевірки йдуть паралельно):
             </p>
-            <pre class="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-slate-950 p-4 text-xs text-slate-100"><code>php artisan queue:work --tries=3 --timeout=60</code></pre>
+            <pre class="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-slate-950 p-4 text-xs text-slate-100"><code>php artisan sites:queue-work</code></pre>
             <p class="mt-3 text-sm text-slate-600">
+                Переглянути черги без запуску: <span class="font-mono text-xs">php artisan sites:queue-work --pretend</span>.
                 Локально: <span class="font-mono text-xs">composer run dev</span> уже запускає
-                <span class="font-mono text-xs">queue:listen</span>, або вручну
+                <span class="font-mono text-xs">sites:queue-work --listen</span>, або вручну
                 <span class="font-mono text-xs">php artisan sites:run-scheduled</span> (лише enqueue).
                 Не запускайте одночасно cron <span class="font-mono text-xs">schedule:run</span> і окремий
                 <span class="font-mono text-xs">sites:run-scheduled</span> — буде подвійна постановка в чергу.
