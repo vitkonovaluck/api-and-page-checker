@@ -64,6 +64,16 @@ final class SiteTransferService
         return 'sites-export-'.now()->format('Y-m-d').'.json';
     }
 
+    public function copy(Site $site): Site
+    {
+        $site->load(['addresses' => fn ($query) => $query->orderBy('id')]);
+
+        $payload = $this->siteToArray($site);
+        $payload['name'] = $site->name.' (копія)';
+
+        return DB::transaction(fn (): Site => $this->createSite($payload));
+    }
+
     /**
      * @return Collection<int, Site>
      */

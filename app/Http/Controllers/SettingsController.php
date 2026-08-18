@@ -4,13 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\Site;
 use App\Services\DatabaseBackupService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -22,10 +19,7 @@ class SettingsController extends Controller
 
     public function index(): View
     {
-        return view('settings.index', [
-            ...$this->backups->viewData(),
-            'sites' => $this->sitesForCopy(),
-        ]);
+        return view('settings.index', $this->backups->viewData());
     }
 
     public function backup(): BinaryFileResponse|RedirectResponse
@@ -80,17 +74,5 @@ class SettingsController extends Controller
         return redirect()
             ->route('settings.index')
             ->with('success', 'Базу даних відновлено з бекапу.');
-    }
-
-    /**
-     * @return Collection<int, Site>
-     */
-    private function sitesForCopy(): Collection
-    {
-        if (! Schema::hasTable('sites')) {
-            return collect();
-        }
-
-        return Site::query()->orderBy('name')->get();
     }
 }

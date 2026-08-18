@@ -54,37 +54,6 @@
             </form>
         </section>
 
-        <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
-            <h2 class="mb-2 text-base font-semibold text-slate-900">Копіювати сайт</h2>
-            <p class="mb-4 text-sm text-slate-600">
-                Створює дублікат сайту з адресами. Історія перевірок не копіюється.
-            </p>
-            @if ($sites->isEmpty())
-                <p class="text-sm text-slate-500">Поки немає сайтів.</p>
-            @else
-                <ul class="divide-y divide-slate-100 rounded-lg border border-slate-200">
-                    @foreach ($sites as $site)
-                        <li class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                                <p class="font-medium text-slate-900">{{ $site->name }}</p>
-                                <p class="break-all font-mono text-xs text-slate-500">{{ $site->base_url }}</p>
-                            </div>
-                            <form method="POST" action="{{ route('sites.copy', $site) }}">
-                                @csrf
-                                <button
-                                    type="submit"
-                                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
-                                >
-                                    @include('partials.icons.copy')
-                                    Копіювати
-                                </button>
-                            </form>
-                        </li>
-                    @endforeach
-                </ul>
-            @endif
-        </section>
-
         <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 class="mb-2 text-base font-semibold text-slate-900">Бекап бази даних</h2>
             @if ($is_mysql)

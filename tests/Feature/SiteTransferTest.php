@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Livewire\Sites\SiteSettingsModal;
 use App\Models\Address;
 use App\Models\Site;
 use App\Models\Snapshot;
@@ -12,6 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\File;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class SiteTransferTest extends TestCase
@@ -24,32 +26,44 @@ class SiteTransferTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_transfer_actions_live_on_settings_not_site_pages(): void
+    public function test_transfer_actions_live_on_settings_and_site_modal(): void
     {
         $site = $this->makeSite();
 
         $this->get(route('sites.index'))
             ->assertOk()
             ->assertDontSee('Імпортувати')
-            ->assertDontSee('Копіювати сайт')
-            ->assertDontSee(route('sites.export', $site), false)
-            ->assertDontSee(route('sites.copy', $site), false);
-
-        $this->get(route('sites.show', $site))
-            ->assertOk()
-            ->assertDontSee('Експортувати')
             ->assertDontSee('Копіювати сайт');
 
         $this->get(route('settings.index'))
             ->assertOk()
             ->assertSee('Експорт сайтів')
             ->assertSee('Імпорт сайтів')
-            ->assertSee('Копіювати сайт')
             ->assertSee('Імпортувати')
-            ->assertSee($site->name)
+            ->assertDontSee('Копіювати сайт')
             ->assertSee(route('sites.export-all'), false)
-            ->assertSee(route('sites.import'), false)
-            ->assertSee(route('sites.copy', $site), false);
+            ->assertSee(route('sites.import'), false);
+
+        Livewire::test(SiteSettingsModal::class, ['site' => $site])
+            ->assertSee('Експортувати')
+            ->assertSee('Копіювати сайт')
+            ->assertSee(route('sites.export', $site), false);
+    }
+
+    public function test_site_settings_modal_copies_site_without_snapshots(): void
+    {
+        $site = $this->makeSite();
+
+        Livewire::test(SiteSettingsModal::class, ['site' => $site])
+            ->call('copy')
+            ->assertRedirect();
+
+        $copy = Site::query()->where('name', 'Demo Shop (копія)')->first();
+        $this->assertNotNull($copy);
+        $this->assertSame('https://api.example.com', $copy->base_url);
+        $this->assertSame(1, $copy->addresses()->count());
+        $this->assertSame(0, $copy->snapshots()->count());
+        $this->assertSame(1, $site->snapshots()->count());
     }
 
     public function test_exporting_a_site_downloads_portable_json_without_history(): void

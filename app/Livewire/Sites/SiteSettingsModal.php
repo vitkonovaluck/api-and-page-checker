@@ -1,9 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Sites;
 
 use App\Models\Site;
+use App\Services\SiteTransferService;
 use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -96,6 +100,15 @@ class SiteSettingsModal extends Component
         $this->redirect(route('sites.show', $this->site), navigate: true);
     }
 
+    public function copy(SiteTransferService $transfer): void
+    {
+        $copy = $transfer->copy($this->site);
+
+        $this->show = false;
+        session()->flash('success', 'Сайт скопійовано.');
+        $this->redirect(route('sites.show', $copy), navigate: true);
+    }
+
     public function clearSnapshots(): void
     {
         $deleted = $this->site->snapshots()->delete();
@@ -110,7 +123,7 @@ class SiteSettingsModal extends Component
         $this->redirect(route('sites.show', $this->site), navigate: true);
     }
 
-    public function render()
+    public function render(): View
     {
         $this->site->loadMissing(['addresses' => fn ($q) => $q->orderBy('id')]);
 
