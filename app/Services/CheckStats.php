@@ -263,7 +263,7 @@ class CheckStats
     }
 
     /**
-     * Time-series of average response time across all site addresses for one period.
+     * Time-series of average response time and TTFB across all site addresses for one period.
      *
      * @return array{
      *     period: string,
@@ -271,15 +271,18 @@ class CheckStats
      *     periods: array<string, array{label: string, hours: int}>,
      *     labels: list<string>,
      *     values: list<int>,
+     *     ttfb_values: list<int|null>,
      *     counts: list<int>,
+     *     series: list<array{key: string, label: string, values: list<int|null>}>,
      *     avg_response_time_ms: int|null,
+     *     avg_ttfb_ms: int|null,
      *     points_count: int,
      *     checks_count: int,
      *     has_data: bool,
      *     mode: 'site'|'address'
      * }
      */
-    public function responseTimeChartForSite(Site $site, ?string $period = null, ResponseTimeMetric $metric = ResponseTimeMetric::Total): array
+    public function responseTimeChartForSite(Site $site, ?string $period = null): array
     {
         $site->loadMissing('addresses');
 
@@ -287,14 +290,12 @@ class CheckStats
             addressIds: $site->addresses->pluck('id'),
             period: $period,
             averageAcrossAddresses: true,
-            seriesLabel: $metric->chartSiteSeriesLabel(),
             mode: 'site',
-            metric: $metric,
         );
     }
 
     /**
-     * Time-series of a single address response times for one period.
+     * Time-series of a single address response time and TTFB for one period.
      *
      * @return array{
      *     period: string,
@@ -302,23 +303,24 @@ class CheckStats
      *     periods: array<string, array{label: string, hours: int}>,
      *     labels: list<string>,
      *     values: list<int>,
+     *     ttfb_values: list<int|null>,
      *     counts: list<int>,
+     *     series: list<array{key: string, label: string, values: list<int|null>}>,
      *     avg_response_time_ms: int|null,
+     *     avg_ttfb_ms: int|null,
      *     points_count: int,
      *     checks_count: int,
      *     has_data: bool,
      *     mode: 'site'|'address'
      * }
      */
-    public function responseTimeChartForAddress(Address $address, ?string $period = null, ResponseTimeMetric $metric = ResponseTimeMetric::Total): array
+    public function responseTimeChartForAddress(Address $address, ?string $period = null): array
     {
         return $this->responseTimeSeries(
             addressIds: [$address->id],
             period: $period,
             averageAcrossAddresses: false,
-            seriesLabel: $address->name ?: $address->endpoint,
             mode: 'address',
-            metric: $metric,
         );
     }
 
@@ -330,8 +332,11 @@ class CheckStats
      *     periods: array<string, array{label: string, hours: int}>,
      *     labels: list<string>,
      *     values: list<int>,
+     *     ttfb_values: list<int|null>,
      *     counts: list<int>,
+     *     series: list<array{key: string, label: string, values: list<int|null>}>,
      *     avg_response_time_ms: int|null,
+     *     avg_ttfb_ms: int|null,
      *     points_count: int,
      *     checks_count: int,
      *     has_data: bool,
@@ -342,109 +347,250 @@ class CheckStats
         Collection|array $addressIds,
         ?string $period,
         bool $averageAcrossAddresses,
-        string $seriesLabel,
         string $mode,
-        ResponseTimeMetric $metric = ResponseTimeMetric::Total,
     ): array {
         $periodKey = $this->normalizePeriod($period);
         $hours = self::RESPONSE_TIME_PERIODS[$periodKey]['hours'];
         $periodLabel = self::RESPONSE_TIME_PERIODS[$periodKey]['label'];
         $addressIds = collect($addressIds)->map(fn ($id) => (int) $id)->filter()->values();
 
-        $empty = [
-            'period' => $periodKey,
-            'period_label' => $periodLabel,
-            'periods' => self::RESPONSE_TIME_PERIODS,
-            'labels' => [],
-            'values' => [],
-            'counts' => [],
-            'avg_response_time_ms' => null,
-            'points_count' => 0,
-            'checks_count' => 0,
-            'has_data' => false,
-            'mode' => $mode,
-            'series_label' => $seriesLabel,
-        ];
-
         if ($addressIds->isEmpty()) {
-            return $empty;
+            return $this->emptyResponseTimeChart($periodKey, $periodLabel, $mode);
         }
 
         $from = now()->subHours($hours);
+        $points = $averageAcrossAddresses
+            ? $this->siteChartPoints($addressIds, $from)
+            : $this->addressChartPoints($addressIds, $from);
 
-        if ($averageAcrossAddresses) {
-            $rows = Snapshot::query()
-                ->whereIn('address_id', $addressIds)
-                ->where('created_at', '>=', $from)
-                ->selectRaw($this->runGroupExpression().' as bucket')
-                ->selectRaw('MIN(created_at) as bucket_at')
-                ->selectRaw($this->avgTimeSelectRaw($metric))
-                ->selectRaw('COUNT(*) as checks_count')
-                ->groupBy('bucket')
-                ->orderBy('bucket_at')
-                ->get();
+        return $this->responseTimeChartPayload($periodKey, $periodLabel, $mode, $points);
+    }
 
-            $labels = [];
-            $values = [];
-            $counts = [];
-            $weightedSum = 0;
-            $checksCount = 0;
+    /**
+     * @return array{
+     *     period: string,
+     *     period_label: string,
+     *     periods: array<string, array{label: string, hours: int}>,
+     *     labels: list<string>,
+     *     values: list<int>,
+     *     ttfb_values: list<int|null>,
+     *     counts: list<int>,
+     *     series: list<array{key: string, label: string, values: list<int|null>}>,
+     *     avg_response_time_ms: int|null,
+     *     avg_ttfb_ms: int|null,
+     *     points_count: int,
+     *     checks_count: int,
+     *     has_data: bool,
+     *     mode: 'site'|'address'
+     * }
+     */
+    private function emptyResponseTimeChart(string $periodKey, string $periodLabel, string $mode): array
+    {
+        return $this->responseTimeChartPayload($periodKey, $periodLabel, $mode, [
+            'labels' => [],
+            'values' => [],
+            'ttfb_values' => [],
+            'counts' => [],
+            'avg_response_time_ms' => null,
+            'avg_ttfb_ms' => null,
+            'checks_count' => 0,
+        ]);
+    }
 
-            foreach ($rows as $row) {
-                if ($row->avg_response_time_ms === null) {
-                    continue;
-                }
-
-                $avg = (int) round((float) $row->avg_response_time_ms);
-                $count = (int) $row->checks_count;
-                $labels[] = $this->formatBucketAtLabel($row->bucket_at);
-                $values[] = $avg;
-                $counts[] = $count;
-                $weightedSum += $avg * $count;
-                $checksCount += $count;
-            }
-        } else {
-            $snapshots = Snapshot::query()
-                ->whereIn('address_id', $addressIds)
-                ->where('created_at', '>=', $from)
-                ->orderBy('created_at')
-                ->get(['response_time_ms', 'timing', 'created_at']);
-
-            $labels = [];
-            $values = [];
-            $counts = [];
-            $weightedSum = 0;
-            $checksCount = 0;
-
-            foreach ($snapshots as $snapshot) {
-                $value = $snapshot->timeMs($metric);
-                if ($value === null) {
-                    continue;
-                }
-
-                $labels[] = $snapshot->created_at?->format('d.m H:i') ?? '';
-                $values[] = $value;
-                $counts[] = 1;
-                $weightedSum += $value;
-                $checksCount++;
-            }
-        }
-
+    /**
+     * @param  array{
+     *     labels: list<string>,
+     *     values: list<int>,
+     *     ttfb_values: list<int|null>,
+     *     counts: list<int>,
+     *     avg_response_time_ms: int|null,
+     *     avg_ttfb_ms: int|null,
+     *     checks_count: int
+     * }  $points
+     * @return array{
+     *     period: string,
+     *     period_label: string,
+     *     periods: array<string, array{label: string, hours: int}>,
+     *     labels: list<string>,
+     *     values: list<int>,
+     *     ttfb_values: list<int|null>,
+     *     counts: list<int>,
+     *     series: list<array{key: string, label: string, values: list<int|null>}>,
+     *     avg_response_time_ms: int|null,
+     *     avg_ttfb_ms: int|null,
+     *     points_count: int,
+     *     checks_count: int,
+     *     has_data: bool,
+     *     mode: 'site'|'address'
+     * }
+     */
+    private function responseTimeChartPayload(string $periodKey, string $periodLabel, string $mode, array $points): array
+    {
+        $values = $points['values'];
+        $ttfbValues = $points['ttfb_values'];
         $pointsCount = count($values);
 
         return [
             'period' => $periodKey,
             'period_label' => $periodLabel,
             'periods' => self::RESPONSE_TIME_PERIODS,
-            'labels' => $labels,
+            'labels' => $points['labels'],
             'values' => $values,
-            'counts' => $counts,
-            'avg_response_time_ms' => $checksCount > 0 ? (int) round($weightedSum / $checksCount) : null,
+            'ttfb_values' => $ttfbValues,
+            'counts' => $points['counts'],
+            'series' => [
+                [
+                    'key' => ResponseTimeMetric::Total->value,
+                    'label' => ResponseTimeMetric::Total->toggleLabel(),
+                    'values' => $values,
+                ],
+                [
+                    'key' => ResponseTimeMetric::Ttfb->value,
+                    'label' => ResponseTimeMetric::Ttfb->toggleLabel(),
+                    'values' => $ttfbValues,
+                ],
+            ],
+            'avg_response_time_ms' => $points['avg_response_time_ms'],
+            'avg_ttfb_ms' => $points['avg_ttfb_ms'],
             'points_count' => $pointsCount,
-            'checks_count' => $checksCount,
+            'checks_count' => $points['checks_count'],
             'has_data' => $pointsCount > 0,
             'mode' => $mode,
-            'series_label' => $seriesLabel,
+        ];
+    }
+
+    /**
+     * @param  Collection<int, int>  $addressIds
+     * @return array{
+     *     labels: list<string>,
+     *     values: list<int>,
+     *     ttfb_values: list<int|null>,
+     *     counts: list<int>,
+     *     avg_response_time_ms: int|null,
+     *     avg_ttfb_ms: int|null,
+     *     checks_count: int
+     * }
+     */
+    private function siteChartPoints(Collection $addressIds, Carbon $from): array
+    {
+        $rows = Snapshot::query()
+            ->whereIn('address_id', $addressIds)
+            ->where('created_at', '>=', $from)
+            ->selectRaw($this->runGroupExpression().' as bucket')
+            ->selectRaw('MIN(created_at) as bucket_at')
+            ->selectRaw($this->avgTimeSelectRaw(ResponseTimeMetric::Total))
+            ->selectRaw($this->avgTimeSelectRaw(ResponseTimeMetric::Ttfb, 'avg_ttfb_ms'))
+            ->selectRaw('COUNT(*) as checks_count')
+            ->selectRaw('SUM(CASE WHEN '.$this->timeExpression(ResponseTimeMetric::Ttfb).' IS NOT NULL THEN 1 ELSE 0 END) as ttfb_checks_count')
+            ->groupBy('bucket')
+            ->orderBy('bucket_at')
+            ->get();
+
+        $labels = [];
+        $values = [];
+        $ttfbValues = [];
+        $counts = [];
+        $weightedSum = 0;
+        $ttfbWeightedSum = 0;
+        $checksCount = 0;
+        $ttfbChecksCount = 0;
+
+        foreach ($rows as $row) {
+            if ($row->avg_response_time_ms === null) {
+                continue;
+            }
+
+            $avg = (int) round((float) $row->avg_response_time_ms);
+            $count = (int) $row->checks_count;
+            $labels[] = $this->formatBucketAtLabel($row->bucket_at);
+            $values[] = $avg;
+            $counts[] = $count;
+            $weightedSum += $avg * $count;
+            $checksCount += $count;
+
+            $bucketTtfbCount = (int) $row->ttfb_checks_count;
+            if ($row->avg_ttfb_ms === null || $bucketTtfbCount === 0) {
+                $ttfbValues[] = null;
+
+                continue;
+            }
+
+            $avgTtfb = (int) round((float) $row->avg_ttfb_ms);
+            $ttfbValues[] = $avgTtfb;
+            $ttfbWeightedSum += $avgTtfb * $bucketTtfbCount;
+            $ttfbChecksCount += $bucketTtfbCount;
+        }
+
+        return [
+            'labels' => $labels,
+            'values' => $values,
+            'ttfb_values' => $ttfbValues,
+            'counts' => $counts,
+            'avg_response_time_ms' => $checksCount > 0 ? (int) round($weightedSum / $checksCount) : null,
+            'avg_ttfb_ms' => $ttfbChecksCount > 0 ? (int) round($ttfbWeightedSum / $ttfbChecksCount) : null,
+            'checks_count' => $checksCount,
+        ];
+    }
+
+    /**
+     * @param  Collection<int, int>  $addressIds
+     * @return array{
+     *     labels: list<string>,
+     *     values: list<int>,
+     *     ttfb_values: list<int|null>,
+     *     counts: list<int>,
+     *     avg_response_time_ms: int|null,
+     *     avg_ttfb_ms: int|null,
+     *     checks_count: int
+     * }
+     */
+    private function addressChartPoints(Collection $addressIds, Carbon $from): array
+    {
+        $snapshots = Snapshot::query()
+            ->whereIn('address_id', $addressIds)
+            ->where('created_at', '>=', $from)
+            ->orderBy('created_at')
+            ->get(['response_time_ms', 'timing', 'created_at']);
+
+        $labels = [];
+        $values = [];
+        $ttfbValues = [];
+        $counts = [];
+        $weightedSum = 0;
+        $ttfbWeightedSum = 0;
+        $checksCount = 0;
+        $ttfbChecksCount = 0;
+
+        foreach ($snapshots as $snapshot) {
+            $total = $snapshot->timeMs(ResponseTimeMetric::Total);
+            if ($total === null) {
+                continue;
+            }
+
+            $ttfb = $snapshot->timeMs(ResponseTimeMetric::Ttfb);
+            $labels[] = $snapshot->created_at?->format('d.m H:i') ?? '';
+            $values[] = $total;
+            $ttfbValues[] = $ttfb;
+            $counts[] = 1;
+            $weightedSum += $total;
+            $checksCount++;
+
+            if ($ttfb === null) {
+                continue;
+            }
+
+            $ttfbWeightedSum += $ttfb;
+            $ttfbChecksCount++;
+        }
+
+        return [
+            'labels' => $labels,
+            'values' => $values,
+            'ttfb_values' => $ttfbValues,
+            'counts' => $counts,
+            'avg_response_time_ms' => $checksCount > 0 ? (int) round($weightedSum / $checksCount) : null,
+            'avg_ttfb_ms' => $ttfbChecksCount > 0 ? (int) round($ttfbWeightedSum / $ttfbChecksCount) : null,
+            'checks_count' => $checksCount,
         ];
     }
 
@@ -537,9 +683,9 @@ class CheckStats
         return (int) round((float) $numeric->avg());
     }
 
-    private function avgTimeSelectRaw(ResponseTimeMetric $metric): string
+    private function avgTimeSelectRaw(ResponseTimeMetric $metric, string $alias = 'avg_response_time_ms'): string
     {
-        return 'AVG('.$this->timeExpression($metric).') as avg_response_time_ms';
+        return 'AVG('.$this->timeExpression($metric).') as '.$alias;
     }
 
     private function timeExpression(ResponseTimeMetric $metric): string

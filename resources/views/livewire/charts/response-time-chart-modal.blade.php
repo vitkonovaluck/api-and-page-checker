@@ -11,14 +11,10 @@
             <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
                 <div>
                     <h2 class="text-base font-semibold text-slate-900">
-                        {{ $mode === 'site' ? $this->responseTimeMetric()->chartSiteTitle() : $this->responseTimeMetric()->chartTitle() }}
+                        {{ $this->chartHeading() }}
                     </h2>
                     <p class="mt-0.5 text-sm text-slate-500">
-                        @if ($mode === 'site')
-                            {{ $this->responseTimeMetric()->chartSiteDescription() }}
-                        @else
-                            {{ $this->responseTimeMetric()->chartAddressDescription() }}
-                        @endif
+                        {{ $this->chartDescription() }}
                     </p>
                 </div>
                 <button
@@ -35,16 +31,22 @@
             </div>
 
             <div class="space-y-4 overflow-y-auto px-5 py-5">
-                <div>
-                    <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Метрика</p>
-                    @include('partials.response-time-metric-toggle')
-                </div>
-
-                @if (($this->chart['avg_response_time_ms'] ?? null) !== null)
-                    <div class="inline-block rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-                        <div class="text-xs uppercase tracking-wide text-slate-500">Середнє за період</div>
-                        <div class="font-semibold text-slate-900">{{ $this->chart['avg_response_time_ms'] }} ms</div>
-                        <div class="text-xs text-slate-500">{{ $this->chart['checks_count'] }} перевірок · {{ $this->chart['period_label'] }}</div>
+                @if (($this->chart['avg_response_time_ms'] ?? null) !== null || ($this->chart['avg_ttfb_ms'] ?? null) !== null)
+                    <div class="flex flex-wrap gap-3">
+                        @if (($this->chart['avg_response_time_ms'] ?? null) !== null)
+                            <div class="inline-block rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                                <div class="text-xs uppercase tracking-wide text-slate-500">{{ $this->totalAverageLabel() }}</div>
+                                <div class="font-semibold text-slate-900">{{ $this->chart['avg_response_time_ms'] }} ms</div>
+                                <div class="text-xs text-slate-500">{{ $this->chart['checks_count'] }} перевірок · {{ $this->chart['period_label'] }}</div>
+                            </div>
+                        @endif
+                        @if (($this->chart['avg_ttfb_ms'] ?? null) !== null)
+                            <div class="inline-block rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                                <div class="text-xs uppercase tracking-wide text-slate-500">{{ $this->ttfbAverageLabel() }}</div>
+                                <div class="font-semibold text-slate-900">{{ $this->chart['avg_ttfb_ms'] }} ms</div>
+                                <div class="text-xs text-slate-500">{{ $this->chart['checks_count'] }} перевірок · {{ $this->chart['period_label'] }}</div>
+                            </div>
+                        @endif
                     </div>
                 @endif
 
@@ -78,20 +80,11 @@
                             data-response-time-chart
                             wire:ignore
                             role="img"
-                            aria-label="{{ $title }}"
+                            aria-label="{{ $this->chartHeading() }}"
                         ></div>
                     </div>
-                    @php
-                        $chartPayload = [
-                            'labels' => $this->chart['labels'],
-                            'values' => $this->chart['values'],
-                            'counts' => $this->chart['counts'],
-                            'series_label' => $this->chart['series_label'] ?? '',
-                            'period_label' => $this->chart['period_label'] ?? '',
-                        ];
-                    @endphp
-                    <script type="application/json" id="{{ $chartId }}-data" wire:key="chart-data-{{ $period }}-{{ $metric }}-{{ $this->chart['checks_count'] }}-{{ $this->chart['avg_response_time_ms'] }}-{{ implode('-', $this->chart['values'] ?? []) }}">
-                        {!! json_encode($chartPayload, JSON_UNESCAPED_UNICODE) !!}
+                    <script type="application/json" id="{{ $chartId }}-data" wire:key="chart-data-{{ $period }}-{{ $this->chart['checks_count'] }}-{{ $this->chart['avg_response_time_ms'] }}-{{ $this->chart['avg_ttfb_ms'] }}-{{ implode('-', $this->chart['values'] ?? []) }}">
+                        {!! json_encode($this->chartPayload(), JSON_UNESCAPED_UNICODE) !!}
                     </script>
                 @endif
             </div>
@@ -146,12 +139,6 @@
         });
 
         $wire.$watch('period', () => {
-            if ($wire.show) {
-                queueMicrotask(() => requestAnimationFrame(renderChart));
-            }
-        });
-
-        $wire.$watch('metric', () => {
             if ($wire.show) {
                 queueMicrotask(() => requestAnimationFrame(renderChart));
             }

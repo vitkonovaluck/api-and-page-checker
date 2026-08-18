@@ -1,0 +1,57 @@
+name: Create PR from dev to main
+
+on:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: create-dev-to-main-pr
+  cancel-in-progress: false
+
+jobs:
+  create-pr:
+    name: Create PR from dev to main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create or reuse pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          git fetch origin main
+
+          commits="$(git rev-list --count origin/main..HEAD)"
+          if [ "$commits" -eq 0 ]; then
+            echo "No commits on dev that are not on main. Skipping."
+            exit 0
+          fi
+
+          existing="$(gh pr list --base main --head dev --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            echo "Open PR already exists: #$existing"
+            exit 0
+          fi
+
+          gh pr create \
+            --base main \
+            --head dev \
+            --title "Promote dev to main" \
+            --body "$(cat <<EOF
+          Automated pull request created after new commits landed on \`dev\`.
+
+          - Compare: https://github.com/${{ github.repository }}/compare/main...dev
+          - Triggering commit: \`${{ github.sha }}\`
+
+          Merge this PR to release the current \`dev\` branch to production (\`main\`).
+          EOF
+          )"

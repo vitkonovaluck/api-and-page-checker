@@ -1,4 +1,7 @@
-const COLOR = '#0f766e';
+const SERIES_COLORS = {
+    total: '#0f766e',
+    ttfb: '#c2410c',
+};
 
 export function initResponseTimeChart(root, chart) {
     if (!root) return;
@@ -7,21 +10,25 @@ export function initResponseTimeChart(root, chart) {
     delete root.dataset.ready;
 
     const labels = chart?.labels || [];
-    const values = chart?.values || [];
     const counts = chart?.counts || [];
+    const series = normalizeSeries(chart);
 
-    if (!labels.length || !values.length) return;
+    if (!labels.length || !series.length) return;
+
+    const numericValues = series.flatMap((item) => item.values.filter((value) => value != null));
+    if (!numericValues.length) return;
 
     const width = 720;
-    const height = 280;
-    const pad = { top: 24, right: 20, bottom: 52, left: 52 };
+    const height = 300;
+    const pad = { top: 40, right: 20, bottom: 52, left: 52 };
     const plotW = width - pad.left - pad.right;
     const plotH = height - pad.top - pad.bottom;
+    const pointCount = Math.max(...series.map((item) => item.values.length), labels.length);
 
-    const maxVal = Math.max(...values, 1);
+    const maxVal = Math.max(...numericValues, 1);
     const yMax = Math.ceil((maxVal * 1.15) / 50) * 50 || 50;
 
-    const xAt = (i) => pad.left + (values.length === 1 ? plotW / 2 : (i / (values.length - 1)) * plotW);
+    const xAt = (i) => pad.left + (pointCount === 1 ? plotW / 2 : (i / (pointCount - 1)) * plotW);
     const yAt = (v) => pad.top + plotH - (v / yMax) * plotH;
 
     const ns = 'http://www.w3.org/2000/svg';
@@ -65,14 +72,12 @@ export function initResponseTimeChart(root, chart) {
         svg.appendChild(text);
     });
 
+    drawLegend(svg, ns, series, pad.left);
+
     const tooltip = document.createElement('div');
     tooltip.className = 'pointer-events-none absolute z-10 hidden rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 shadow-md';
     root.style.position = 'relative';
     root.appendChild(tooltip);
-
-    const tipHtml = (i) =>
-        `<strong>${chart.series_label || 'Час відповіді'}</strong><br>${labels[i]}: ${values[i]} ms` +
-        (counts[i] ? `<br><span class="text-slate-500">${counts[i]} перевірок</span>` : '');
 
     const showTip = (evt, html) => {
         const rect = root.getBoundingClientRect();
@@ -80,40 +85,126 @@ export function initResponseTimeChart(root, chart) {
         tooltip.classList.remove('hidden');
         const x = evt.clientX - rect.left + 12;
         const y = evt.clientY - rect.top - 10;
-        tooltip.style.left = Math.min(x, rect.width - 160) + 'px';
+        tooltip.style.left = Math.min(x, rect.width - 180) + 'px';
         tooltip.style.top = Math.max(0, y) + 'px';
     };
     const hideTip = () => tooltip.classList.add('hidden');
 
-    if (values.length >= 2) {
-        const points = values.map((value, i) => `${xAt(i)},${yAt(value)}`).join(' ');
+    series.forEach((item) => {
+        drawSeriesLine(svg, ns, item, xAt, yAt);
+        drawSeriesPoints(svg, ns, item, labels, counts, xAt, yAt, showTip, hideTip);
+    });
+
+    root.appendChild(svg);
+    root.dataset.ready = '1';
+}
+
+function normalizeSeries(chart) {
+    if (Array.isArray(chart?.series) && chart.series.length) {
+        return chart.series.map((item) => ({
+            key: item.key || 'total',
+            label: item.label || 'Час відповіді',
+            values: item.values || [],
+            color: SERIES_COLORS[item.key] || SERIES_COLORS.total,
+        }));
+    }
+
+    return [{
+        key: 'total',
+        label: chart?.series_label || 'Час відповіді',
+        values: chart?.values || [],
+        color: SERIES_COLORS.total,
+    }];
+}
+
+function drawLegend(svg, ns, series, left) {
+    let x = left;
+    series.forEach((item) => {
+        const line = document.createElementNS(ns, 'line');
+        line.setAttribute('x1', String(x));
+        line.setAttribute('x2', String(x + 16));
+        line.setAttribute('y1', '16');
+        line.setAttribute('y2', '16');
+        line.setAttribute('stroke', item.color);
+        line.setAttribute('stroke-width', '2.5');
+        line.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(line);
+
+        const text = document.createElementNS(ns, 'text');
+        text.setAttribute('x', String(x + 22));
+        text.setAttribute('y', '20');
+        text.setAttribute('fill', '#334155');
+        text.setAttribute('font-size', '12');
+        text.textContent = item.label;
+        svg.appendChild(text);
+
+        x += 28 + item.label.length * 7;
+    });
+}
+
+function drawSeriesLine(svg, ns, item, xAt, yAt) {
+    const segments = contiguousSegments(item.values);
+    segments.forEach((segment) => {
+        if (segment.length < 2) return;
+
+        const points = segment.map(([index, value]) => `${xAt(index)},${yAt(value)}`).join(' ');
         const path = document.createElementNS(ns, 'polyline');
         path.setAttribute('fill', 'none');
-        path.setAttribute('stroke', COLOR);
+        path.setAttribute('stroke', item.color);
         path.setAttribute('stroke-width', '2.5');
         path.setAttribute('stroke-linejoin', 'round');
         path.setAttribute('stroke-linecap', 'round');
         path.setAttribute('points', points);
         svg.appendChild(path);
-    }
+    });
+}
 
-    values.forEach((value, i) => {
+function drawSeriesPoints(svg, ns, item, labels, counts, xAt, yAt, showTip, hideTip) {
+    item.values.forEach((value, i) => {
+        if (value == null) return;
+
         const circle = document.createElementNS(ns, 'circle');
         circle.setAttribute('cx', String(xAt(i)));
         circle.setAttribute('cy', String(yAt(value)));
         circle.setAttribute('r', '4');
-        circle.setAttribute('fill', COLOR);
+        circle.setAttribute('fill', item.color);
         circle.setAttribute('stroke', '#fff');
         circle.setAttribute('stroke-width', '1.5');
         circle.style.cursor = 'pointer';
-        circle.addEventListener('mouseenter', (evt) => showTip(evt, tipHtml(i)));
-        circle.addEventListener('mousemove', (evt) => showTip(evt, tipHtml(i)));
+        const html = pointTooltipHtml(item, labels[i], value, counts[i]);
+        circle.addEventListener('mouseenter', (evt) => showTip(evt, html));
+        circle.addEventListener('mousemove', (evt) => showTip(evt, html));
         circle.addEventListener('mouseleave', hideTip);
         svg.appendChild(circle);
     });
+}
 
-    root.appendChild(svg);
-    root.dataset.ready = '1';
+function contiguousSegments(values) {
+    const segments = [];
+    let current = [];
+
+    values.forEach((value, index) => {
+        if (value == null) {
+            if (current.length) {
+                segments.push(current);
+                current = [];
+            }
+            return;
+        }
+
+        current.push([index, value]);
+    });
+
+    if (current.length) {
+        segments.push(current);
+    }
+
+    return segments;
+}
+
+function pointTooltipHtml(item, label, value, count) {
+    return `<strong>${item.label}</strong><br>${label}: ${value} ms` +
+        (count ? `<br><span class="text-slate-500">${count} перевірок</span>` : '');
 }
 
 window.initResponseTimeChart = initResponseTimeChart;

@@ -591,7 +591,7 @@ class ApiSnapshotCheckerTest extends TestCase
             ->assertDontSee('500 ms');
     }
 
-    public function test_address_page_and_chart_switch_to_ttfb_together(): void
+    public function test_address_page_switches_displayed_times_to_ttfb_without_changing_chart(): void
     {
         $site = Site::query()->create([
             'name' => 'TTFB Address',
@@ -631,8 +631,12 @@ class ApiSnapshotCheckerTest extends TestCase
             'chartId' => 'address-response-time-chart',
         ])
             ->call('open')
-            ->assertSet('metric', 'ttfb')
-            ->assertSee('Історія TTFB');
+            ->assertSee('Історія часу відповіді та TTFB')
+            ->assertSee('Середній час')
+            ->assertSee('Середній TTFB')
+            ->assertSee('250')
+            ->assertSee('55')
+            ->assertDontSee('Метрика');
     }
 
     public function test_error_snapshots_modal_lists_failed_schedule_requests(): void
