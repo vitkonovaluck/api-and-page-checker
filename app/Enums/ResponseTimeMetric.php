@@ -82,43 +82,23 @@ enum ResponseTimeMetric: string
         return $this->toggleLabel();
     }
 
-    public function chartTitle(): string
+    public static function combinedChartTitle(): string
     {
-        return match ($this) {
-            self::Total => 'Історія часу відповіді',
-            self::Ttfb => 'Історія TTFB',
-        };
+        return 'Історія часу відповіді та TTFB';
     }
 
-    public function chartSiteTitle(): string
+    public static function combinedChartSiteTitle(): string
     {
-        return match ($this) {
-            self::Total => 'Історія часу відповіді адрес',
-            self::Ttfb => 'Історія TTFB адрес',
-        };
+        return 'Історія часу відповіді та TTFB адрес';
     }
 
-    public function chartSiteSeriesLabel(): string
+    public static function combinedChartSiteDescription(): string
     {
-        return match ($this) {
-            self::Total => 'Середнє по всіх адресах',
-            self::Ttfb => 'Середнє TTFB по всіх адресах',
-        };
+        return 'Середні значення часу відповіді та TTFB по всіх адресах за обраний період';
     }
 
-    public function chartSiteDescription(): string
+    public static function combinedChartAddressDescription(): string
     {
-        return match ($this) {
-            self::Total => 'Середнє значення часу відповіді по всіх адресах за обраний період',
-            self::Ttfb => 'Середнє значення TTFB по всіх адресах за обраний період',
-        };
-    }
-
-    public function chartAddressDescription(): string
-    {
-        return match ($this) {
-            self::Total => 'Час відповіді адреси за обраний період',
-            self::Ttfb => 'TTFB адреси за обраний період',
-        };
+        return 'Час відповіді та TTFB адреси за обраний період';
     }
 }

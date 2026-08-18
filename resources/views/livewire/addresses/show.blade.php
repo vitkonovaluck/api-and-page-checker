@@ -50,7 +50,7 @@
     <livewire:charts.response-time-chart-modal
         mode="address"
         :address-id="$address->id"
-        title="Історія часу відповіді"
+        title="Історія часу відповіді та TTFB"
         chart-id="address-response-time-chart"
         :key="'chart-address-'.$address->id"
     />
