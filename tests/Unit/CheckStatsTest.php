@@ -135,7 +135,7 @@ class CheckStatsTest extends TestCase
         $this->assertSame(50, $ttfb['avg_response_time_ms']);
     }
 
-    public function test_address_chart_uses_ttfb_values_when_selected(): void
+    public function test_address_chart_includes_total_and_ttfb_series(): void
     {
         $site = Site::query()->create([
             'name' => 'Demo',
@@ -150,11 +150,16 @@ class CheckStatsTest extends TestCase
         $this->createSnapshot($address, 700, null, now()->subMinutes(10)->toDateTimeString(), timing: $this->timing(120));
         $this->createSnapshot($address, 900, null, now()->subMinutes(5)->toDateTimeString());
 
-        $chart = app(CheckStats::class)->responseTimeChartForAddress($address, '6h', ResponseTimeMetric::Ttfb);
+        $chart = app(CheckStats::class)->responseTimeChartForAddress($address, '6h');
 
-        $this->assertSame([80, 120], $chart['values']);
-        $this->assertSame(100, $chart['avg_response_time_ms']);
-        $this->assertSame(2, $chart['checks_count']);
+        $this->assertSame([500, 700, 900], $chart['values']);
+        $this->assertSame([80, 120, null], $chart['ttfb_values']);
+        $this->assertSame(700, $chart['avg_response_time_ms']);
+        $this->assertSame(100, $chart['avg_ttfb_ms']);
+        $this->assertSame(3, $chart['checks_count']);
+        $this->assertSame('total', $chart['series'][0]['key']);
+        $this->assertSame('ttfb', $chart['series'][1]['key']);
+        $this->assertSame([80, 120, null], $chart['series'][1]['values']);
     }
 
     public function test_address_chart_uses_selected_period_sample(): void
@@ -199,15 +204,17 @@ class CheckStatsTest extends TestCase
         ]);
 
         $bucket = now()->subMinutes(20)->format('Y-m-d H:i:00');
-        $this->createSnapshot($a1, 100, null, $bucket);
-        $this->createSnapshot($a2, 300, null, $bucket);
+        $this->createSnapshot($a1, 100, null, $bucket, timing: $this->timing(40));
+        $this->createSnapshot($a2, 300, null, $bucket, timing: $this->timing(80));
 
         $chart = app(CheckStats::class)->responseTimeChartForSite($site, '6h');
 
         $this->assertSame('site', $chart['mode']);
         $this->assertTrue($chart['has_data']);
         $this->assertSame([200], $chart['values']);
+        $this->assertSame([60], $chart['ttfb_values']);
         $this->assertSame(200, $chart['avg_response_time_ms']);
+        $this->assertSame(60, $chart['avg_ttfb_ms']);
         $this->assertSame(2, $chart['checks_count']);
     }
 

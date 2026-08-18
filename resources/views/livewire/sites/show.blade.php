@@ -72,7 +72,7 @@
     <livewire:charts.response-time-chart-modal
         mode="site"
         :site-id="$site->id"
-        title="Історія часу відповіді адрес"
+        title="Історія часу відповіді та TTFB адрес"
         chart-id="site-response-time-chart"
         :key="'chart-site-'.$site->id"
     />

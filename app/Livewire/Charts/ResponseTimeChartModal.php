@@ -1,26 +1,27 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Charts;
 
-use App\Livewire\Concerns\InteractsWithResponseTimeMetric;
+use App\Enums\ResponseTimeMetric;
 use App\Models\Address;
 use App\Models\Site;
 use App\Services\CheckStats;
+use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
 class ResponseTimeChartModal extends Component
 {
-    use InteractsWithResponseTimeMetric;
-
     public string $mode = 'site';
 
     public ?int $siteId = null;
 
     public ?int $addressId = null;
 
-    public string $title = 'Історія часу відповіді';
+    public string $title = 'Історія часу відповіді та TTFB';
 
     public string $chartId = 'response-time-chart';
 
@@ -32,7 +33,7 @@ class ResponseTimeChartModal extends Component
         string $mode = 'site',
         ?int $siteId = null,
         ?int $addressId = null,
-        string $title = 'Історія часу відповіді',
+        string $title = 'Історія часу відповіді та TTFB',
         string $chartId = 'response-time-chart',
     ): void {
         $this->mode = $mode;
@@ -41,14 +42,12 @@ class ResponseTimeChartModal extends Component
         $this->title = $title;
         $this->chartId = $chartId;
         $this->period = CheckStats::DEFAULT_RESPONSE_TIME_PERIOD;
-        $this->hydrateResponseTimeMetric();
     }
 
     #[On('open-response-time-chart')]
     public function open(): void
     {
         $this->show = true;
-        $this->hydrateResponseTimeMetric();
         unset($this->chart);
         $this->dispatch('chart-should-render');
     }
@@ -79,30 +78,73 @@ class ResponseTimeChartModal extends Component
         $this->dispatch('chart-should-render');
     }
 
-    protected function afterResponseTimeMetricChanged(): void
+    public function chartHeading(): string
     {
-        unset($this->chart);
-        $this->dispatch('chart-should-render');
+        return match ($this->mode) {
+            'site' => ResponseTimeMetric::combinedChartSiteTitle(),
+            default => ResponseTimeMetric::combinedChartTitle(),
+        };
+    }
+
+    public function chartDescription(): string
+    {
+        return match ($this->mode) {
+            'site' => ResponseTimeMetric::combinedChartSiteDescription(),
+            default => ResponseTimeMetric::combinedChartAddressDescription(),
+        };
     }
 
     #[Computed]
     public function chart(): array
     {
         $checkStats = app(CheckStats::class);
-        $metric = $this->responseTimeMetric();
 
         if ($this->mode === 'address') {
             $address = Address::query()->findOrFail($this->addressId);
 
-            return $checkStats->responseTimeChartForAddress($address, $this->period, $metric);
+            return $checkStats->responseTimeChartForAddress($address, $this->period);
         }
 
         $site = Site::query()->findOrFail($this->siteId);
 
-        return $checkStats->responseTimeChartForSite($site, $this->period, $metric);
+        return $checkStats->responseTimeChartForSite($site, $this->period);
     }
 
-    public function render()
+    /**
+     * @return array{
+     *     labels: list<string>,
+     *     values: list<int>,
+     *     ttfb_values: list<int|null>,
+     *     counts: list<int>,
+     *     series: list<array{key: string, label: string, values: list<int|null>}>,
+     *     period_label: string
+     * }
+     */
+    public function chartPayload(): array
+    {
+        $chart = $this->chart;
+
+        return [
+            'labels' => $chart['labels'],
+            'values' => $chart['values'],
+            'ttfb_values' => $chart['ttfb_values'] ?? [],
+            'counts' => $chart['counts'],
+            'series' => $chart['series'] ?? [],
+            'period_label' => $chart['period_label'] ?? '',
+        ];
+    }
+
+    public function totalAverageLabel(): string
+    {
+        return ResponseTimeMetric::Total->historyAverageLabel();
+    }
+
+    public function ttfbAverageLabel(): string
+    {
+        return ResponseTimeMetric::Ttfb->historyAverageLabel();
+    }
+
+    public function render(): View
     {
         return view('livewire.charts.response-time-chart-modal');
     }
