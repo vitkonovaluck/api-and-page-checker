@@ -27,7 +27,10 @@ class Site extends Model
 
     public const CHECKS_PER_MINUTE_DEFAULT = 32;
 
+    public const SCHEDULE_INTERVAL_AFTER = 'after';
+
     public const SCHEDULE_INTERVALS = [
+        self::SCHEDULE_INTERVAL_AFTER => 0,
         '5m' => 5,
         '15m' => 15,
         '30m' => 30,
@@ -37,6 +40,7 @@ class Site extends Model
     ];
 
     public const SCHEDULE_INTERVAL_LABELS = [
+        self::SCHEDULE_INTERVAL_AFTER => 'Після попередньої перевірки (1 хв)',
         '5m' => 'Кожні 5 хвилин',
         '15m' => 'Кожні 15 хвилин',
         '30m' => 'Кожні 30 хвилин',
@@ -60,6 +64,11 @@ class Site extends Model
         }
 
         return (int) config('checking.requests_per_minute', self::CHECKS_PER_MINUTE_DEFAULT);
+    }
+
+    public function usesChainChecks(): bool
+    {
+        return $this->schedule_enabled && $this->schedule_interval === self::SCHEDULE_INTERVAL_AFTER;
     }
 
     public static function checkQueueName(int $siteId): string

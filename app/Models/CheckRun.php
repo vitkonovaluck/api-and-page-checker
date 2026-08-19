@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -19,6 +21,8 @@ class CheckRun extends Model
     public const SOURCE_SCHEDULE = 'schedule';
 
     public const SOURCE_MANUAL = 'manual';
+
+    public const SOURCE_CHAIN = 'chain';
 
     protected function casts(): array
     {

@@ -88,7 +88,7 @@
                         <label for="schedule_interval" class="mb-1 block text-sm font-medium text-slate-700">Період</label>
                         <select
                             id="schedule_interval"
-                            wire:model="schedule_interval"
+                            wire:model.live="schedule_interval"
                             class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
                         >
                             @foreach (\App\Models\Site::SCHEDULE_INTERVAL_LABELS as $value => $label)
@@ -99,7 +99,11 @@
                     </div>
                 </div>
                 <p class="mt-3 text-xs text-slate-500">
-                    Запуски вирівнюються по годиннику (наприклад, кожні 15 хв — о :00, :15, :30, :45), щоб контролювати навантаження.
+                    @if ($schedule_interval === \App\Models\Site::SCHEDULE_INTERVAL_AFTER)
+                        Після завершення попередньої перевірки наступна запуститься через 1 хв. Перший запуск — кнопкою «Перевірити всі адреси».
+                    @else
+                        Запуски вирівнюються по годиннику (наприклад, кожні 15 хв — о :00, :15, :30, :45), щоб контролювати навантаження.
+                    @endif
                 </p>
                 @if ($site->schedule_last_run_at)
                     <p class="mt-3 text-xs text-slate-500">
