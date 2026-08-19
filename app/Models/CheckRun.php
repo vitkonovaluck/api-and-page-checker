@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'site_id',
     'source',
     'started_at',
+    'remaining_jobs',
 ])]
 class CheckRun extends Model
 {
@@ -29,6 +30,7 @@ class CheckRun extends Model
         return [
             'started_at' => 'datetime',
             'created_at' => 'datetime',
+            'remaining_jobs' => 'integer',
         ];
     }
 
@@ -42,12 +44,13 @@ class CheckRun extends Model
         return $this->hasMany(Snapshot::class);
     }
 
-    public static function start(Site $site, string $source): self
+    public static function start(Site $site, string $source, int $remainingJobs = 0): self
     {
         return static::query()->create([
             'site_id' => $site->id,
             'source' => $source,
             'started_at' => now(),
+            'remaining_jobs' => max(0, $remainingJobs),
         ]);
     }
 }

@@ -1,3 +1,4 @@
+<div>
 <div wire:poll.3s="refreshData">
     <div class="mb-6">
         <a href="{{ route('sites.index') }}" wire:navigate class="text-sm text-sky-700 hover:underline">← До списку сайтів</a>
@@ -64,18 +65,6 @@
             </div>
         </div>
     </div>
-
-    <livewire:sites.site-settings-modal :site="$site" :key="'site-settings-'.$site->id" />
-    <livewire:addresses.create-address-modal :site="$site" :key="'create-address-'.$site->id" />
-    <livewire:sites.address-list-modal :site="$site" :key="'address-list-'.$site->id" />
-    <livewire:sites.error-snapshots-modal :site="$site" :key="'error-snapshots-'.$site->id" />
-    <livewire:charts.response-time-chart-modal
-        mode="site"
-        :site-id="$site->id"
-        title="Історія часу відповіді та TTFB адрес"
-        chart-id="site-response-time-chart"
-        :key="'chart-site-'.$site->id"
-    />
 
     @if (($scheduleStats && $scheduleStats['checks_count'] > 0) || ($siteStats['checks_count'] ?? 0) > 0)
         <section class="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -318,4 +307,17 @@
             </div>
         @endif
     </section>
+</div>
+
+    <livewire:sites.site-settings-modal :site="$site" :key="'site-settings-'.$site->id" />
+    <livewire:addresses.create-address-modal :site="$site" :key="'create-address-'.$site->id" />
+    <livewire:sites.address-list-modal :site="$site" :key="'address-list-'.$site->id" />
+    <livewire:sites.error-snapshots-modal :site="$site" :key="'error-snapshots-'.$site->id" />
+    <livewire:charts.response-time-chart-modal
+        mode="site"
+        :site-id="$site->id"
+        title="Історія часу відповіді та TTFB адрес"
+        chart-id="site-response-time-chart"
+        :key="'chart-site-'.$site->id"
+    />
 </div>

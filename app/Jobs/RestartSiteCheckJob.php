@@ -10,7 +10,6 @@ use App\Services\CheckingGuard;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -35,33 +34,21 @@ class RestartSiteCheckJob implements ShouldBeUnique, ShouldQueue
         return 'chain-'.$this->siteId;
     }
 
-    private static function remainingCacheKey(int $checkRunId): string
-    {
-        return 'check-run:remaining:'.$checkRunId;
-    }
-
-    public static function rememberRemaining(int $checkRunId, int $count): void
-    {
-        Cache::put(self::remainingCacheKey($checkRunId), $count, now()->addDay());
-    }
-
     public static function releaseSlot(int $checkRunId): bool
     {
-        $key = self::remainingCacheKey($checkRunId);
+        $updated = CheckRun::query()
+            ->whereKey($checkRunId)
+            ->where('remaining_jobs', '>', 0)
+            ->decrement('remaining_jobs');
 
-        if (! Cache::has($key)) {
+        if ($updated === 0) {
             return false;
         }
 
-        $remaining = (int) Cache::decrement($key);
-
-        if ($remaining !== 0) {
-            return false;
-        }
-
-        Cache::forget($key);
-
-        return true;
+        return CheckRun::query()
+            ->whereKey($checkRunId)
+            ->where('remaining_jobs', '<=', 0)
+            ->exists();
     }
 
     public static function dispatchDelayed(int $siteId): void
@@ -73,7 +60,13 @@ class RestartSiteCheckJob implements ShouldBeUnique, ShouldQueue
     {
         $site = Site::query()->find($this->siteId);
 
-        if ($site === null || ! $site->usesChainChecks() || $guard->isBusy()) {
+        if ($site === null || ! $site->usesChainChecks()) {
+            return;
+        }
+
+        if ($guard->isBusy($this->siteId)) {
+            $this->retryLater();
+
             return;
         }
 
@@ -94,6 +87,15 @@ class RestartSiteCheckJob implements ShouldBeUnique, ShouldQueue
             'site_id' => $this->siteId,
             'error' => $exception?->getMessage(),
         ]);
+    }
+
+    private function retryLater(): void
+    {
+        if ($this->job === null) {
+            return;
+        }
+
+        $this->release(self::delaySeconds());
     }
 
     private static function delaySeconds(): int

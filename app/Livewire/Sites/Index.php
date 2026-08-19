@@ -18,6 +18,8 @@ class Index extends Component
      */
     public array $busySiteIds = [];
 
+    public bool $checksBusy = false;
+
     public function mount(CheckingGuard $guard): void
     {
         $this->syncBusyState($guard);
@@ -49,8 +51,14 @@ class Index extends Component
         return view('livewire.sites.index', compact('sites'));
     }
 
+    public function checksBusy(): bool
+    {
+        return $this->checksBusy;
+    }
+
     private function syncBusyState(CheckingGuard $guard): void
     {
         $this->busySiteIds = $guard->busySiteIds();
+        $this->checksBusy = $this->busySiteIds !== [];
     }
 }

@@ -240,9 +240,55 @@ class ApiSnapshotCheckerTest extends TestCase
 
         Livewire::test(SitesIndex::class)
             ->assertSet('busySiteIds', [$busySite->id])
+            ->assertSet('checksBusy', true)
             ->assertSee('Busy Shop')
             ->assertSee('Перевіряється…')
-            ->assertSee('Idle Shop');
+            ->assertSee('Idle Shop')
+            ->call('checksBusy');
+    }
+
+    public function test_site_show_accepts_legacy_checks_busy_calls_while_site_is_busy(): void
+    {
+        config(['queue.default' => 'database']);
+
+        $site = Site::query()->create([
+            'name' => 'Busy Shop',
+            'base_url' => 'https://busy.example.com',
+        ]);
+        Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/health',
+        ]);
+
+        CheckAddressJob::dispatch($site->addresses()->first());
+
+        Livewire::test(Show::class, ['site' => $site])
+            ->assertSet('busySiteIds', [$site->id])
+            ->assertSet('checksBusy', true)
+            ->call('checksBusy')
+            ->assertSet('checksBusy', true);
+    }
+
+    public function test_address_show_accepts_legacy_checks_busy_calls_while_site_is_busy(): void
+    {
+        config(['queue.default' => 'database']);
+
+        $site = Site::query()->create([
+            'name' => 'Busy Shop',
+            'base_url' => 'https://busy.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/health',
+        ]);
+
+        CheckAddressJob::dispatch($address);
+
+        Livewire::test(AddressShow::class, ['site' => $site, 'address' => $address])
+            ->assertSet('busySiteIds', [$site->id])
+            ->assertSet('checksBusy', true)
+            ->call('checksBusy')
+            ->assertSet('checksBusy', true);
     }
 
     public function test_manual_check_of_another_site_is_allowed_while_jobs_are_pending(): void
@@ -395,6 +441,31 @@ class ApiSnapshotCheckerTest extends TestCase
         $this->get(route('sites.show', $site))
             ->assertOk()
             ->assertSee(Site::SCHEDULE_INTERVAL_LABELS[Site::SCHEDULE_INTERVAL_AFTER]);
+    }
+
+    public function test_enabling_schedule_checkbox_saves_without_changing_period(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/health',
+            'schedule_enabled' => true,
+        ]);
+
+        Livewire::test(SiteSettingsModal::class, ['site' => $site])
+            ->set('schedule_enabled', true)
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertRedirect("/sites/{$site->id}")
+            ->assertSessionHas('success', 'Сайт оновлено.');
+
+        $site = $site->fresh();
+        $this->assertTrue($site->schedule_enabled);
+        $this->assertSame(Site::SCHEDULE_INTERVAL_AFTER, $site->schedule_interval);
+        $this->assertTrue($address->fresh()->schedule_enabled);
     }
 
     public function test_site_settings_reject_checks_per_minute_below_minimum(): void
