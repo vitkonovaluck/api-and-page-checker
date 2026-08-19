@@ -1,54 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Sites;
 
 use App\Models\Site;
 use App\Services\CheckingGuard;
-use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
 #[Title('Список сайтів — API Snapshot Checker')]
 class Index extends Component
 {
-    public bool $checksBusy = false;
+    /**
+     * @var list<int>
+     */
+    public array $busySiteIds = [];
 
     public function mount(CheckingGuard $guard): void
     {
-        $this->checksBusy = $guard->isBusy();
-    }
-
-    public function copy(Site $site): void
-    {
-        $site->load('addresses');
-
-        $copy = DB::transaction(function () use ($site) {
-            $newSite = Site::query()->create([
-                'name' => $site->name.' (копія)',
-                'base_url' => $site->base_url,
-                'schedule_enabled' => $site->schedule_enabled,
-                'schedule_interval' => $site->schedule_interval,
-                'schedule_last_run_at' => null,
-                'requests_per_minute' => $site->requests_per_minute,
-            ]);
-
-            foreach ($site->addresses as $address) {
-                $newSite->addresses()->create([
-                    'name' => $address->name,
-                    'endpoint' => $address->endpoint,
-                    'http_method' => $address->http_method,
-                    'schedule_enabled' => $address->schedule_enabled,
-                    'request_headers' => $address->request_headers,
-                    'request_body' => $address->request_body,
-                    'last_checked_at' => null,
-                ]);
-            }
-
-            return $newSite;
-        });
-
-        session()->flash('success', 'Сайт скопійовано.');
-        $this->redirect(route('sites.show', $copy), navigate: true);
+        $this->syncBusyState($guard);
     }
 
     public function delete(Site $site): void
@@ -61,12 +33,12 @@ class Index extends Component
 
     public function refreshData(CheckingGuard $guard): void
     {
-        $this->checksBusy = $guard->isBusy();
+        $this->syncBusyState($guard);
     }
 
-    public function render(CheckingGuard $guard)
+    public function render(CheckingGuard $guard): View
     {
-        $this->checksBusy = $guard->isBusy();
+        $this->syncBusyState($guard);
 
         $sites = Site::query()
             ->withCount('addresses')
@@ -75,5 +47,10 @@ class Index extends Component
             ->get();
 
         return view('livewire.sites.index', compact('sites'));
+    }
+
+    private function syncBusyState(CheckingGuard $guard): void
+    {
+        $this->busySiteIds = $guard->busySiteIds();
     }
 }

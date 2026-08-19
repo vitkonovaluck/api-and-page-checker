@@ -51,6 +51,23 @@ class CheckAddressJobTest extends TestCase
         $this->assertNotNull($address->fresh()->last_checked_at);
     }
 
+    public function test_job_is_assigned_to_the_site_queue(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/health',
+        ]);
+
+        $job = new CheckAddressJob($address);
+
+        $this->assertSame($site->id, $job->siteId);
+        $this->assertSame(Site::checkQueueName($site->id), $job->queue);
+    }
+
     public function test_job_retries_too_many_requests_before_saving_snapshot(): void
     {
         // Arrange

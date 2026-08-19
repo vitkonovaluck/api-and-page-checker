@@ -136,6 +136,33 @@
                 @endif
             </div>
 
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <h3 class="mb-1 text-sm font-semibold text-slate-900">Експорт і копія</h3>
+                <p class="mb-3 text-sm text-slate-600">
+                    Експорт зберігає JSON цього сайту для іншого сервера. Копія створює дублікат тут, без історії перевірок.
+                </p>
+                <div class="flex flex-wrap gap-2">
+                    <a
+                        href="{{ route('sites.export', $site) }}"
+                        class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                    >
+                        @include('partials.icons.download')
+                        Експортувати
+                    </a>
+                    <button
+                        type="button"
+                        wire:click="copy"
+                        wire:loading.attr="disabled"
+                        wire:target="copy"
+                        class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        @include('partials.icons.copy')
+                        <span wire:loading.remove wire:target="copy">Копіювати сайт</span>
+                        <span wire:loading wire:target="copy">Копіювання…</span>
+                    </button>
+                </div>
+            </div>
+
             <div class="rounded-lg border border-red-200 bg-red-50/50 p-4">
                 <h3 class="mb-1 text-sm font-semibold text-slate-900">Знімки (snapshots)</h3>
                 <p class="mb-3 text-sm text-slate-600">
