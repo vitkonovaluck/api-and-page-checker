@@ -1,10 +1,12 @@
 <dialog
+    wire:ignore.self
     x-data
-    x-effect="$wire.show ? $el.showModal() : ($el.open && $el.close())"
+    x-effect="$wire.show ? ($el.open || $el.showModal()) : ($el.open && $el.close())"
+    @close="$wire.close()"
     @click="if ($event.target === $el) $wire.close()"
     class="w-[calc(100%-2rem)] max-w-2xl rounded-xl border border-slate-200 bg-white p-0 shadow-xl backdrop:bg-slate-900/40"
 >
-    <form wire:submit="save" class="flex max-h-[85vh] flex-col">
+    <form wire:submit.prevent="save" class="flex max-h-[85vh] flex-col">
         <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
             <div>
                 <h2 class="text-base font-semibold text-slate-900">Налаштування сайту</h2>
@@ -24,6 +26,15 @@
         </div>
 
         <div class="space-y-6 overflow-y-auto px-5 py-5">
+            @if ($errors->any())
+                <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+                    <ul class="list-disc space-y-1 pl-4">
+                        @foreach ($errors->all() as $message)
+                            <li>{{ $message }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
             <div class="grid gap-4 sm:grid-cols-2">
                 <div>
                     <label for="settings_name" class="mb-1 block text-sm font-medium text-slate-700">Назва</label>
@@ -79,7 +90,7 @@
                     <label class="flex items-center gap-2 text-sm text-slate-700">
                         <input
                             type="checkbox"
-                            wire:model="schedule_enabled"
+                            wire:model.live="schedule_enabled"
                             class="rounded border-slate-300 text-slate-900 focus:ring-slate-200"
                         >
                         Увімкнути розклад
@@ -120,7 +131,7 @@
                                     <label class="flex items-start gap-2 text-sm text-slate-700">
                                         <input
                                             type="checkbox"
-                                            wire:model="address_schedule"
+                                            wire:model.live="address_schedule"
                                             value="{{ $address->id }}"
                                             class="mt-0.5 rounded border-slate-300 text-slate-900 focus:ring-slate-200"
                                         >

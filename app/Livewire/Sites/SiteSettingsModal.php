@@ -73,12 +73,14 @@ class SiteSettingsModal extends Component
             ],
         ]);
 
+        $scheduleEnabled = (bool) $this->schedule_enabled;
+
         $this->site->fill([
             'name' => $validated['name'],
             'base_url' => rtrim($validated['base_url'], '/'),
-            'schedule_enabled' => $this->schedule_enabled,
-            'schedule_interval' => $this->schedule_enabled
-                ? ($validated['schedule_interval'] ?? null)
+            'schedule_enabled' => $scheduleEnabled,
+            'schedule_interval' => $scheduleEnabled
+                ? ($validated['schedule_interval'] ?? $this->defaultScheduleInterval())
                 : $this->site->schedule_interval,
             'requests_per_minute' => (int) $validated['requestsPerMinute'],
         ])->save();
@@ -98,6 +100,13 @@ class SiteSettingsModal extends Component
         $this->show = false;
         session()->flash('success', 'Сайт оновлено.');
         $this->redirect(route('sites.show', $this->site), navigate: true);
+    }
+
+    public function updatedScheduleEnabled(): void
+    {
+        if ($this->schedule_enabled && ($this->schedule_interval === null || $this->schedule_interval === '')) {
+            $this->schedule_interval = $this->defaultScheduleInterval();
+        }
     }
 
     public function copy(SiteTransferService $transfer): void
@@ -137,7 +146,7 @@ class SiteSettingsModal extends Component
         $this->name = $this->site->name;
         $this->base_url = $this->site->base_url;
         $this->schedule_enabled = (bool) $this->site->schedule_enabled;
-        $this->schedule_interval = $this->site->schedule_interval;
+        $this->schedule_interval = $this->site->schedule_interval ?: $this->defaultScheduleInterval();
         $this->requestsPerMinute = $this->resolvedRequestsPerMinute();
         $this->address_schedule = $this->site->addresses
             ->where('schedule_enabled', true)
@@ -160,5 +169,10 @@ class SiteSettingsModal extends Component
         }
 
         return min(Site::CHECKS_PER_MINUTE_MAX, $fallback);
+    }
+
+    private function defaultScheduleInterval(): string
+    {
+        return (string) array_key_first(Site::SCHEDULE_INTERVALS);
     }
 }

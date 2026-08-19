@@ -23,6 +23,8 @@ class Show extends Component
      */
     public array $busySiteIds = [];
 
+    public bool $checksBusy = false;
+
     public function mount(Site $site, CheckingGuard $guard): void
     {
         $this->site = $site;
@@ -68,8 +70,14 @@ class Show extends Component
         ])->title($this->site->name.' — API Snapshot Checker');
     }
 
+    public function checksBusy(): bool
+    {
+        return $this->checksBusy;
+    }
+
     private function syncBusyState(CheckingGuard $guard): void
     {
         $this->busySiteIds = $guard->busySiteIds();
+        $this->checksBusy = in_array($this->site->id, $this->busySiteIds, true);
     }
 }

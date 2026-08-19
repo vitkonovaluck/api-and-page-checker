@@ -83,12 +83,46 @@ class RestartSiteCheckJobTest extends TestCase
             'endpoint' => '/health',
         ]);
 
-        Cache::put(CheckingGuard::MANUAL_KEY, true, 60);
+        Cache::put(CheckingGuard::manualKey((int) $site->id), true, 60);
 
         (new RestartSiteCheckJob($site->id))->handle(app(CheckingGuard::class));
 
         Queue::assertNothingPushed();
         $this->assertDatabaseCount('check_runs', 0);
+    }
+
+    public function test_handle_still_queues_when_another_site_is_busy(): void
+    {
+        config(['queue.default' => 'database']);
+
+        $site = Site::query()->create([
+            'name' => 'Chained',
+            'base_url' => 'https://chain.example.com',
+            'schedule_enabled' => true,
+            'schedule_interval' => Site::SCHEDULE_INTERVAL_AFTER,
+        ]);
+        Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/one',
+            'schedule_enabled' => true,
+        ]);
+
+        $other = Site::query()->create([
+            'name' => 'Busy',
+            'base_url' => 'https://busy.example.com',
+        ]);
+        $otherAddress = Address::query()->create([
+            'site_id' => $other->id,
+            'endpoint' => '/health',
+        ]);
+        CheckAddressJob::dispatch($otherAddress);
+
+        Queue::fake();
+
+        (new RestartSiteCheckJob((int) $site->id))->handle(app(CheckingGuard::class));
+
+        Queue::assertPushed(CheckAddressJob::class, 1);
+        $this->assertSame(CheckRun::SOURCE_CHAIN, CheckRun::query()->value('source'));
     }
 
     public function test_job_is_assigned_to_the_site_queue(): void

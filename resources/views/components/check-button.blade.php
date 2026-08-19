@@ -15,7 +15,9 @@
         local: false,
         siteId: {{ (int) $siteId }},
         get checking() {
-            return this.local || (this.$wire.busySiteIds || []).some(id => Number(id) === this.siteId);
+            const ids = this.$wire.$get('busySiteIds');
+
+            return this.local || (Array.isArray(ids) ? ids : []).some(id => Number(id) === this.siteId);
         },
     }"
     @submit="if (checking || {{ $disabled ? 'true' : 'false' }}) { $event.preventDefault(); return; } local = true"
