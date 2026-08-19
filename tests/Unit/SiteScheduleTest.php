@@ -82,6 +82,19 @@ class SiteScheduleTest extends TestCase
         $this->assertTrue($site->isDueForScheduledCheck(Carbon::parse('2026-08-07 10:22:00')));
     }
 
+    public function test_after_previous_interval_is_never_due_on_the_clock(): void
+    {
+        $site = new Site([
+            'schedule_enabled' => true,
+            'schedule_interval' => Site::SCHEDULE_INTERVAL_AFTER,
+            'schedule_last_run_at' => null,
+        ]);
+
+        $this->assertTrue($site->usesChainChecks());
+        $this->assertFalse($site->isDueForScheduledCheck(Carbon::parse('2026-08-07 10:00:00')));
+        $this->assertFalse($site->isDueForScheduledCheck(Carbon::parse('2026-08-07 10:15:00')));
+    }
+
     public function test_checks_per_minute_uses_site_setting_when_set(): void
     {
         // Arrange

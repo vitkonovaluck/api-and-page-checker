@@ -53,11 +53,7 @@ class CheckController extends Controller
                     ->with('success', 'Немає адрес для перевірки.');
             }
 
-            $run = CheckRun::start($site, CheckRun::SOURCE_MANUAL);
-
-            foreach ($addresses as $address) {
-                CheckAddressJob::dispatch($address, $run->id);
-            }
+            CheckAddressJob::dispatchForSite($site, CheckRun::SOURCE_MANUAL, $addresses);
 
             $checked = $addresses->count();
 

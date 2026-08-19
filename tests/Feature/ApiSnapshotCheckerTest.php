@@ -373,6 +373,30 @@ class ApiSnapshotCheckerTest extends TestCase
         $this->assertSame(5, $site->fresh()->checksPerMinute());
     }
 
+    public function test_can_enable_chain_checks_in_settings(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+
+        Livewire::test(SiteSettingsModal::class, ['site' => $site])
+            ->set('schedule_enabled', true)
+            ->set('schedule_interval', Site::SCHEDULE_INTERVAL_AFTER)
+            ->call('save')
+            ->assertRedirect("/sites/{$site->id}")
+            ->assertSessionHas('success', 'Сайт оновлено.');
+
+        $site = $site->fresh();
+        $this->assertTrue($site->schedule_enabled);
+        $this->assertSame(Site::SCHEDULE_INTERVAL_AFTER, $site->schedule_interval);
+        $this->assertTrue($site->usesChainChecks());
+
+        $this->get(route('sites.show', $site))
+            ->assertOk()
+            ->assertSee(Site::SCHEDULE_INTERVAL_LABELS[Site::SCHEDULE_INTERVAL_AFTER]);
+    }
+
     public function test_site_settings_reject_checks_per_minute_below_minimum(): void
     {
         $site = Site::query()->create([

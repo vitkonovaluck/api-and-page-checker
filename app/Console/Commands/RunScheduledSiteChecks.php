@@ -21,6 +21,7 @@ class RunScheduledSiteChecks extends Command
         $sites = Site::query()
             ->where('schedule_enabled', true)
             ->whereNotNull('schedule_interval')
+            ->where('schedule_interval', '!=', Site::SCHEDULE_INTERVAL_AFTER)
             ->with(['addresses' => fn ($q) => $q->where('schedule_enabled', true)->orderBy('id')])
             ->get();
 
@@ -41,12 +42,8 @@ class RunScheduledSiteChecks extends Command
 
             $ran++;
 
-            $run = CheckRun::start($site, CheckRun::SOURCE_SCHEDULE);
-
-            foreach ($site->addresses as $address) {
-                CheckAddressJob::dispatch($address, $run->id);
-                $queued++;
-            }
+            CheckAddressJob::dispatchForSite($site, CheckRun::SOURCE_SCHEDULE, $site->addresses);
+            $queued += $site->addresses->count();
 
             $this->info("Site #{$site->id} ({$site->name}): queued {$site->addresses->count()} address(es).");
         }
