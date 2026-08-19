@@ -31,6 +31,16 @@ return [
     'requests_per_minute' => (int) env('CHECK_REQUESTS_PER_MINUTE', 32),
     /*
     |--------------------------------------------------------------------------
+    | Chain the next site check after the previous run finishes
+    |--------------------------------------------------------------------------
+    |
+    | When a site schedule interval is "after", the last address job of a run
+    | queues another check of schedule-enabled addresses after this delay.
+    |
+    */
+    'chain_delay_seconds' => (int) env('CHECKING_CHAIN_DELAY_SECONDS', 60),
+    /*
+    |--------------------------------------------------------------------------
     | Retry after HTTP 429 Too Many Requests
     |--------------------------------------------------------------------------
     |

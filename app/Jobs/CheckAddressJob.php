@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\Address;
+use App\Models\CheckRun;
+use App\Models\Site;
 use App\Services\SnapshotChecker;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Middleware\RateLimited;
+use Illuminate\Support\Collection;
+use Throwable;
 
 class CheckAddressJob implements ShouldQueue
 {
@@ -18,10 +22,34 @@ class CheckAddressJob implements ShouldQueue
 
     public int $timeout = 90;
 
+    public int $siteId;
+
     public function __construct(
         public Address $address,
         public ?int $checkRunId = null,
-    ) {}
+    ) {
+        $this->siteId = (int) $address->site_id;
+        $this->onQueue(Site::checkQueueName($this->siteId));
+    }
+
+    /**
+     * @param  iterable<int, Address>  $addresses
+     */
+    public static function dispatchForSite(Site $site, string $source, iterable $addresses): CheckRun
+    {
+        $addressList = Collection::make($addresses);
+        $run = CheckRun::start($site, $source);
+
+        if ($addressList->isNotEmpty()) {
+            RestartSiteCheckJob::rememberRemaining((int) $run->id, $addressList->count());
+        }
+
+        foreach ($addressList as $address) {
+            self::dispatch($address, $run->id);
+        }
+
+        return $run;
+    }
 
     /**
      * @return list<object>
@@ -40,5 +68,26 @@ class CheckAddressJob implements ShouldQueue
         if ($delay > 0) {
             sleep($delay);
         }
+
+        $this->maybeQueueChainedCheck();
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        $this->maybeQueueChainedCheck();
+    }
+
+    private function maybeQueueChainedCheck(): void
+    {
+        if ($this->checkRunId === null || ! RestartSiteCheckJob::releaseSlot($this->checkRunId)) {
+            return;
+        }
+
+        $site = Site::query()->find($this->siteId);
+        if ($site === null || ! $site->usesChainChecks()) {
+            return;
+        }
+
+        RestartSiteCheckJob::dispatchDelayed($this->siteId);
     }
 }

@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace Tests\Unit;
 
 use App\Jobs\CheckAddressJob;
+use App\Jobs\RestartSiteCheckJob;
 use App\Models\Address;
+use App\Models\CheckRun;
 use App\Models\Site;
 use App\Services\SnapshotChecker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Queue\Middleware\RateLimited;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Sleep;
 use Mockery;
 use Tests\TestCase;
@@ -18,6 +22,12 @@ use Tests\TestCase;
 class CheckAddressJobTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
 
     public function test_job_runs_snapshot_checker_for_address(): void
     {
@@ -174,5 +184,67 @@ class CheckAddressJobTest extends TestCase
         $elapsedMs = (hrtime(true) - $started) / 1_000_000;
 
         $this->assertLessThan(500, $elapsedMs);
+    }
+
+    public function test_job_is_assigned_to_the_site_queue(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/health',
+        ]);
+
+        $job = new CheckAddressJob($address);
+
+        $this->assertSame($site->id, $job->siteId);
+        $this->assertSame(Site::checkQueueName($site->id), $job->queue);
+    }
+
+    public function test_last_job_of_a_run_queues_chained_restart_when_enabled(): void
+    {
+        Queue::fake();
+        Carbon::setTestNow('2026-08-19 12:00:00');
+        config(['checking.delay_seconds' => 0, 'checking.chain_delay_seconds' => 60]);
+
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+            'schedule_enabled' => true,
+            'schedule_interval' => Site::SCHEDULE_INTERVAL_AFTER,
+        ]);
+        $first = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/one',
+        ]);
+        $second = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/two',
+        ]);
+
+        Http::fake([
+            'https://api.example.com/one' => Http::response(['ok' => true], 200),
+            'https://api.example.com/two' => Http::response(['ok' => true], 200),
+        ]);
+
+        $run = CheckAddressJob::dispatchForSite($site, CheckRun::SOURCE_MANUAL, [$first, $second]);
+
+        Queue::assertPushed(CheckAddressJob::class, 2);
+        Queue::assertNotPushed(RestartSiteCheckJob::class);
+
+        (new CheckAddressJob($first, $run->id))->handle(app(SnapshotChecker::class));
+
+        Queue::assertNotPushed(RestartSiteCheckJob::class);
+
+        (new CheckAddressJob($second, $run->id))->handle(app(SnapshotChecker::class));
+
+        Queue::assertPushed(RestartSiteCheckJob::class, 1);
+        Queue::assertPushed(RestartSiteCheckJob::class, function (RestartSiteCheckJob $job) use ($site): bool {
+            return $job->siteId === $site->id
+                && $job->delay !== null
+                && $job->delay->equalTo(now()->addSeconds(60));
+        });
     }
 }
