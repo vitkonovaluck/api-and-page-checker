@@ -54,6 +54,7 @@
             </form>
         </section>
 
+        @if ($isAdmin)
         <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 class="mb-2 text-base font-semibold text-slate-900">Бекап бази даних</h2>
             @if ($is_mysql)
@@ -128,6 +129,7 @@
                 </button>
             </form>
         </section>
+        @endif
 
         <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
             <h2 class="mb-2 text-base font-semibold text-slate-900">Розклад перевірок</h2>

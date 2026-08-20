@@ -34,6 +34,19 @@ class CheckingGuard
         return $this->pendingJobSiteIds();
     }
 
+    /**
+     * @param  list<int>  $siteIds
+     * @return list<int>
+     */
+    public function busySiteIdsAmong(array $siteIds): array
+    {
+        if ($siteIds === []) {
+            return [];
+        }
+
+        return array_values(array_intersect($this->busySiteIds(), $siteIds));
+    }
+
     public function tryStartManual(int $siteId, int $ttlSeconds = 3600): bool
     {
         if ($this->hasPendingCheckJobs($siteId)) {

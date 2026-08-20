@@ -34,6 +34,7 @@ class Show extends Component
     public function mount(Site $site, Address $address, CheckingGuard $guard): void
     {
         abort_unless($address->site_id === $site->id, 404);
+        $this->authorize('view', $site);
 
         $this->site = $site;
         $this->address = $address;

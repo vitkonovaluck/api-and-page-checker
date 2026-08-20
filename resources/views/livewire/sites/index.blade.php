@@ -2,12 +2,13 @@
     <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
             <h1 class="text-2xl font-semibold text-slate-900">Список сайтів</h1>
-            <p class="mt-1 text-sm text-slate-600">У сайту вказується базовий URL, у адрес — лише ендпоїнти. Система об’єднує їх при перевірці.</p>
+            <p class="mt-1 text-sm text-slate-600">У сайту вказується базовий URL, у адрес — лише ендпоїнти. Система об’єднує їх при перевірці. Тариф: сайти {{ $sitesUsed }}/{{ $sitesMax }}.</p>
         </div>
         <button
             type="button"
             wire:click="$dispatch('open-create-site')"
-            class="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            @disabled(! $canCreateSite)
+            class="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
             Додати сайт
         </button>

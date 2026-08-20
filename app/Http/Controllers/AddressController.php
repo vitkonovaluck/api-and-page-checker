@@ -14,6 +14,7 @@ class AddressController extends Controller
     public function destroy(Site $site, Address $address): RedirectResponse
     {
         abort_unless($address->site_id === $site->id, 404);
+        $this->authorize('update', $site);
 
         $address->delete();
 
@@ -26,6 +27,7 @@ class AddressController extends Controller
     {
         abort_unless($address->site_id === $site->id, 404);
         abort_unless($snapshot->address_id === $address->id, 404);
+        $this->authorize('view', $site);
 
         $address->setRelation('site', $site);
         $previous = $snapshot->previous();
@@ -44,6 +46,7 @@ class AddressController extends Controller
     {
         abort_unless($address->site_id === $site->id, 404);
         abort_unless($snapshot->address_id === $address->id, 404);
+        $this->authorize('update', $site);
 
         $snapshot->delete();
 

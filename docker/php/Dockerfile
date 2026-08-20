@@ -4,11 +4,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
         unzip \
         default-mysql-client \
+        libicu-dev \
         libonig-dev \
         libsqlite3-dev \
         libzip-dev \
     && docker-php-ext-install -j$(nproc) \
         bcmath \
+        intl \
         opcache \
         pcntl \
         pdo_mysql \

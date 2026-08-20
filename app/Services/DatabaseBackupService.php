@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
@@ -586,7 +588,8 @@ class DatabaseBackupService
             return null;
         }
 
-        $path = (string) config('database.connections.sqlite.database');
+        $connection = (string) config('database.default');
+        $path = (string) config('database.connections.'.$connection.'.database');
 
         if ($path === '' || $path === ':memory:') {
             return null;

@@ -8,4 +8,57 @@
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+    --animate-landing-float: landing-float 7s ease-in-out infinite;
+    --animate-landing-scan: landing-scan 3.6s ease-in-out infinite;
+    --animate-landing-pulse-dot: landing-pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes landing-float {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-14px);
+    }
+}
+
+@keyframes landing-scan {
+    0% {
+        top: -30%;
+        opacity: 0;
+    }
+    18% {
+        opacity: 1;
+    }
+    82% {
+        opacity: 1;
+    }
+    100% {
+        top: 110%;
+        opacity: 0;
+    }
+}
+
+@keyframes landing-pulse-dot {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgb(52 211 153 / 0.55);
+    }
+    70% {
+        box-shadow: 0 0 0 8px rgb(52 211 153 / 0);
+    }
+}
+
+.landing-grid {
+    background-image:
+        linear-gradient(to right, rgb(255 255 255 / 0.045) 1px, transparent 1px),
+        linear-gradient(to bottom, rgb(255 255 255 / 0.045) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 75%);
+}
+
+.landing-scan {
+    top: -30%;
 }
