@@ -2,8 +2,8 @@
     wire:ignore.self
     x-data
     x-effect="$wire.show ? ($el.open || $el.showModal()) : ($el.open && $el.close())"
-    @close="$wire.close()"
-    @click="if ($event.target === $el) $wire.close()"
+    x-on:cancel.prevent=""
+    x-on:close="if ($wire.show) { $nextTick(() => { if ($wire.show && ! $el.open) { $el.showModal() } }) }"
     class="w-[calc(100%-2rem)] max-w-2xl rounded-xl border border-slate-200 bg-white p-0 shadow-xl backdrop:bg-slate-900/40"
 >
     <form wire:submit.prevent="save" class="flex max-h-[85vh] flex-col">
