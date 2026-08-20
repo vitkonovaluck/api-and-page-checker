@@ -113,6 +113,76 @@ class CheckStatsTest extends TestCase
         $this->assertSame(2, $stats['latest_checks_count']);
     }
 
+    public function test_latest_average_uses_only_addresses_from_the_last_check_run(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $a1 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/one',
+        ]);
+        $a2 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/two',
+        ]);
+        $a3 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/three',
+        ]);
+
+        $previousRun = CheckRun::start($site, CheckRun::SOURCE_MANUAL);
+        $latestRun = CheckRun::start($site, CheckRun::SOURCE_MANUAL);
+
+        $this->createSnapshot($a1, 100, null, '2026-08-01 10:00:00', $previousRun->id);
+        $this->createSnapshot($a2, 200, null, '2026-08-01 10:00:01', $previousRun->id);
+        $this->createSnapshot($a3, 300, null, '2026-08-01 10:00:02', $previousRun->id);
+
+        $this->createSnapshot($a1, 400, null, '2026-08-01 11:00:00', $latestRun->id);
+        $this->createSnapshot($a2, 500, null, '2026-08-01 11:00:01', $latestRun->id);
+
+        $stats = app(CheckStats::class)->forSite($site);
+
+        $this->assertSame(2, $stats['latest_checks_count']);
+        $this->assertSame(450, $stats['avg_latest_response_time_ms']);
+    }
+
+    public function test_latest_ttfb_average_uses_only_addresses_from_the_last_check_run(): void
+    {
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $a1 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/one',
+        ]);
+        $a2 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/two',
+        ]);
+        $a3 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/three',
+        ]);
+
+        $previousRun = CheckRun::start($site, CheckRun::SOURCE_MANUAL);
+        $latestRun = CheckRun::start($site, CheckRun::SOURCE_MANUAL);
+
+        $this->createSnapshot($a1, 400, null, '2026-08-01 10:00:00', $previousRun->id, $this->timing(40));
+        $this->createSnapshot($a2, 500, null, '2026-08-01 10:00:01', $previousRun->id, $this->timing(50));
+        $this->createSnapshot($a3, 600, null, '2026-08-01 10:00:02', $previousRun->id, $this->timing(60));
+
+        $this->createSnapshot($a1, 800, null, '2026-08-01 11:00:00', $latestRun->id, $this->timing(80));
+        $this->createSnapshot($a2, 1200, null, '2026-08-01 11:00:01', $latestRun->id, $this->timing(120));
+
+        $stats = app(CheckStats::class)->forSite($site, scheduledOnly: false, metric: ResponseTimeMetric::Ttfb);
+
+        $this->assertSame(2, $stats['latest_checks_count']);
+        $this->assertSame(100, $stats['avg_latest_response_time_ms']);
+    }
+
     public function test_averages_ttfb_from_timing_json(): void
     {
         $site = Site::query()->create([
@@ -269,6 +339,7 @@ class CheckStatsTest extends TestCase
             ->assertSeeLivewire(ErrorSnapshotsModal::class)
             ->assertSee('Сер. час (остання)')
             ->assertSee('200 ms')
+            ->assertSee('середнє за останній прохід')
             ->assertSee('Сер. час');
     }
 
