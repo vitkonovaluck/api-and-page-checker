@@ -340,7 +340,10 @@ class CheckStatsTest extends TestCase
             ->assertSee('Сер. час (остання)')
             ->assertSee('200 ms')
             ->assertSee('середнє за останній прохід')
-            ->assertSee('Сер. час');
+            ->assertSee('Сер. час')
+            ->assertSee('xl:grid-cols-5', false)
+            ->assertSee('overflow-auto', false)
+            ->assertSee('lg:h-[calc(100dvh-8rem)]', false);
     }
 
     public function test_error_snapshots_for_site_lists_schedule_errors_only(): void
