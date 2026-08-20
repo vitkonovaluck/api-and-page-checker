@@ -1,34 +1,36 @@
 <div>
-<div wire:poll.3s="refreshData">
-    <div class="mb-6">
-        <a href="{{ route('sites.index') }}" wire:navigate class="text-sm text-sky-700 hover:underline">← До списку сайтів</a>
-        <div class="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-                <h1 class="text-2xl font-semibold text-slate-900">{{ $site->name }}</h1>
-                @if (in_array($site->id, $busySiteIds, true))
-                    <p class="mt-1 inline-flex items-center gap-1 text-sm font-medium text-emerald-800">
-                        @include('partials.icons.spinner', ['class' => 'h-3.5 w-3.5 animate-spin'])
-                        Перевіряється…
+<div wire:poll.3s="refreshData" class="flex min-h-0 flex-col gap-3 lg:h-[calc(100dvh-8rem)]">
+    <div class="mb-0 shrink-0">
+        <div class="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+            <div class="min-w-0">
+                <a href="{{ route('sites.index') }}" wire:navigate class="text-xs text-sky-700 hover:underline">← До списку сайтів</a>
+                <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                    <h1 class="text-lg font-semibold text-slate-900">{{ $site->name }}</h1>
+                    @if (in_array($site->id, $busySiteIds, true))
+                        <p class="inline-flex items-center gap-1 text-xs font-medium text-emerald-800">
+                            @include('partials.icons.spinner', ['class' => 'h-3 w-3 animate-spin'])
+                            Перевіряється…
+                        </p>
+                    @endif
+                    <p class="break-all font-mono text-xs text-slate-600">{{ $site->base_url }}</p>
+                    <p class="text-xs text-slate-600">
+                        Адреси цього сайту ({{ $site->addresses->count() }})
+                        @if ($site->schedule_enabled)
+                            <span class="text-emerald-700">
+                                · розклад: {{ \App\Models\Site::SCHEDULE_INTERVAL_LABELS[$site->schedule_interval] ?? $site->schedule_interval }}
+                            </span>
+                        @endif
+                        @if ($site->checksPerMinute() > 0)
+                            <span class="text-slate-500">· {{ $site->checksPerMinute() }} перевірок/хв</span>
+                        @endif
                     </p>
-                @endif
-                <p class="mt-1 break-all font-mono text-sm text-slate-600">{{ $site->base_url }}</p>
-                <p class="mt-1 text-sm text-slate-600">
-                    Адреси цього сайту ({{ $site->addresses->count() }})
-                    @if ($site->schedule_enabled)
-                        <span class="ml-2 text-emerald-700">
-                            · розклад: {{ \App\Models\Site::SCHEDULE_INTERVAL_LABELS[$site->schedule_interval] ?? $site->schedule_interval }}
-                        </span>
-                    @endif
-                    @if ($site->checksPerMinute() > 0)
-                        <span class="ml-2 text-slate-500">· {{ $site->checksPerMinute() }} перевірок/хв</span>
-                    @endif
-                </p>
+                </div>
             </div>
-            <div class="flex flex-wrap gap-2">
+            <div class="flex flex-wrap gap-1.5">
                 <button
                     type="button"
                     wire:click="$dispatch('open-site-settings')"
-                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
                 >
                     @include('partials.icons.cog')
                     Налаштування
@@ -36,7 +38,7 @@
                 <button
                     type="button"
                     wire:click="$dispatch('open-address-list')"
-                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
                 >
                     Список адрес
                 </button>
@@ -44,14 +46,14 @@
                 <button
                     type="button"
                     wire:click="$dispatch('open-response-time-chart')"
-                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
                 >
                     Графік
                 </button>
                 <button
                     type="button"
                     wire:click="$dispatch('open-create-address')"
-                    class="inline-flex rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                    class="inline-flex rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
                 >
                     Додати адресу
                 </button>
@@ -61,75 +63,82 @@
                     :busy="in_array($site->id, $busySiteIds, true)"
                     :disabled="$site->addresses->isEmpty()"
                     label="Перевірити всі адреси"
+                    class="px-3 py-1.5"
                 />
             </div>
         </div>
     </div>
 
     @if (($scheduleStats && $scheduleStats['checks_count'] > 0) || ($siteStats['checks_count'] ?? 0) > 0)
-        <section class="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 class="mb-1 text-base font-semibold text-slate-900">Середні показники перевірок</h2>
-            <p class="mb-4 text-sm text-slate-500">
-                Середньоарифметичні значення за історією знімків
-                @if ($site->schedule_enabled)
-                    (для розкладу — окремо по запусках)
-                @endif
-            </p>
-            <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <section class="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div class="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                <h2 class="text-sm font-semibold text-slate-900">Середні показники перевірок</h2>
+                <p class="text-xs text-slate-500">
+                    Середньоарифметичні значення за історією знімків
+                    @if ($site->schedule_enabled)
+                        (для розкладу — окремо по запусках)
+                    @endif
+                </p>
+            </div>
+            <dl @class([
+                'grid grid-cols-1 gap-2 sm:grid-cols-2',
+                'xl:grid-cols-5' => $site->schedule_enabled && $scheduleStats && $scheduleStats['checks_count'] > 0,
+                'xl:grid-cols-3' => ! ($site->schedule_enabled && $scheduleStats && $scheduleStats['checks_count'] > 0),
+            ])>
                 @if ($site->schedule_enabled && $scheduleStats && $scheduleStats['checks_count'] > 0)
-                    <div class="rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-3">
-                        <dt class="text-xs uppercase tracking-wide text-emerald-800/70">{{ $metricEnum->scheduleAverageLabel() }}</dt>
-                        <dd class="mt-1 text-lg font-semibold text-emerald-900">
+                    <div class="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+                        <dt class="text-[11px] uppercase tracking-wide text-emerald-800/70">{{ $metricEnum->scheduleAverageLabel() }}</dt>
+                        <dd class="mt-0.5 text-base font-semibold text-emerald-900">
                             {{ $scheduleStats['avg_response_time_ms'] !== null ? $scheduleStats['avg_response_time_ms'].' ms' : '—' }}
                         </dd>
-                        <p class="mt-1 text-xs text-emerald-800/70">
+                        <p class="mt-0.5 text-[11px] text-emerald-800/70">
                             {{ $scheduleStats['checks_count'] }} перевірок у розкладі
                         </p>
                     </div>
-                    <div class="rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-3">
-                        <dt class="text-xs uppercase tracking-wide text-emerald-800/70">Сер. помилок / запуск</dt>
-                        <dd class="mt-1 text-lg font-semibold text-emerald-900">
+                    <div class="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+                        <dt class="text-[11px] uppercase tracking-wide text-emerald-800/70">Сер. помилок / запуск</dt>
+                        <dd class="mt-0.5 text-base font-semibold text-emerald-900">
                             {{ $scheduleStats['avg_errors_per_run'] !== null ? $scheduleStats['avg_errors_per_run'] : '—' }}
                         </dd>
-                        <p class="mt-1 text-xs text-emerald-800/70">
+                        <p class="mt-0.5 text-[11px] text-emerald-800/70">
                             {{ $scheduleStats['error_count'] }} помилок за {{ $scheduleStats['runs_count'] }} запусків
                         </p>
                         @if (($scheduleStats['error_count'] ?? 0) > 0)
                             <button
                                 type="button"
                                 wire:click="$dispatch('open-error-snapshots')"
-                                class="mt-2 inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-white/80 px-2.5 py-1 text-xs font-medium text-emerald-900 hover:bg-white"
+                                class="mt-1 inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-white/80 px-2 py-0.5 text-[11px] font-medium text-emerald-900 hover:bg-white"
                             >
-                                @include('partials.icons.eye', ['class' => 'h-3.5 w-3.5'])
+                                @include('partials.icons.eye', ['class' => 'h-3 w-3'])
                                 Переглянути помилки
                             </button>
                         @endif
                     </div>
                 @endif
-                <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                    <dt class="text-xs uppercase tracking-wide text-slate-500">{{ $metricEnum->latestAverageLabel() }}</dt>
-                    <dd class="mt-1 text-lg font-semibold text-slate-900">
+                <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <dt class="text-[11px] uppercase tracking-wide text-slate-500">{{ $metricEnum->latestAverageLabel() }}</dt>
+                    <dd class="mt-0.5 text-base font-semibold text-slate-900">
                         {{ $siteStats['avg_latest_response_time_ms'] !== null ? $siteStats['avg_latest_response_time_ms'].' ms' : '—' }}
                     </dd>
-                    <p class="mt-1 text-xs text-slate-500">
+                    <p class="mt-0.5 text-[11px] text-slate-500">
                         середнє за останній прохід · {{ $siteStats['latest_checks_count'] }} адрес
                     </p>
                 </div>
-                <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                    <dt class="text-xs uppercase tracking-wide text-slate-500">{{ $metricEnum->allAverageLabel() }}</dt>
-                    <dd class="mt-1 text-lg font-semibold text-slate-900">
+                <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <dt class="text-[11px] uppercase tracking-wide text-slate-500">{{ $metricEnum->allAverageLabel() }}</dt>
+                    <dd class="mt-0.5 text-base font-semibold text-slate-900">
                         {{ $siteStats['avg_response_time_ms'] !== null ? $siteStats['avg_response_time_ms'].' ms' : '—' }}
                     </dd>
-                    <p class="mt-1 text-xs text-slate-500">
+                    <p class="mt-0.5 text-[11px] text-slate-500">
                         {{ $siteStats['checks_count'] }} перевірок загалом
                     </p>
                 </div>
-                <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                    <dt class="text-xs uppercase tracking-wide text-slate-500">Сер. помилок / перевірка</dt>
-                    <dd class="mt-1 text-lg font-semibold text-slate-900">
+                <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <dt class="text-[11px] uppercase tracking-wide text-slate-500">Сер. помилок / перевірка</dt>
+                    <dd class="mt-0.5 text-base font-semibold text-slate-900">
                         {{ $siteStats['avg_errors'] !== null ? $siteStats['avg_errors'] : '—' }}
                     </dd>
-                    <p class="mt-1 text-xs text-slate-500">
+                    <p class="mt-0.5 text-[11px] text-slate-500">
                         {{ $siteStats['error_count'] }} помилок загалом
                     </p>
                 </div>
@@ -137,24 +146,24 @@
         </section>
     @endif
 
-    <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div class="border-b border-slate-200 px-5 py-4 flex items-center justify-between gap-3">
-            <h2 class="text-base font-semibold text-slate-900">Адреси</h2>
+    <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div class="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-4 py-2">
+            <h2 class="text-sm font-semibold text-slate-900">Адреси</h2>
             <button
                 type="button"
                 wire:click="$dispatch('open-create-address')"
-                class="inline-flex rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
+                class="inline-flex rounded-lg bg-slate-900 px-3 py-1 text-sm font-medium text-white hover:bg-slate-800"
             >
                 Додати адресу
             </button>
         </div>
 
         @if ($site->addresses->isEmpty())
-            <p class="px-5 py-8 text-sm text-slate-500">Ще немає адрес. Додайте ендпоїнт кнопкою вище.</p>
+            <p class="px-4 py-6 text-sm text-slate-500">Ще немає адрес. Додайте ендпоїнт кнопкою вище.</p>
         @else
-            <div class="w-full max-w-full overflow-hidden">
+            <div wire:key="site-addresses-scroll" class="min-h-0 w-full max-w-full flex-1 overflow-auto overscroll-contain">
                 <table class="w-full table-fixed divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                    <thead class="sticky top-0 z-10 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                         <tr>
                             <th class="w-10 px-3 py-2" title="Розклад">
                                 <span class="sr-only">Розклад</span>
