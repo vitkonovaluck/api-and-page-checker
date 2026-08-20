@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use App\Enums\ResponseTimeMetric;
@@ -145,26 +147,7 @@ class CheckStats
             ->get();
 
         $runsCount = $runBuckets->count();
-
-        $latestSnapshotIds = Snapshot::query()
-            ->whereIn('address_id', $addressIds)
-            ->selectRaw('MAX(id) as id')
-            ->groupBy('address_id')
-            ->pluck('id');
-
-        $latestChecksCount = $latestSnapshotIds->count();
-        $avgLatestResponseTimeMs = null;
-
-        if ($latestChecksCount > 0) {
-            $latestAvg = Snapshot::query()
-                ->whereIn('id', $latestSnapshotIds)
-                ->selectRaw($this->avgTimeSelectRaw($metric))
-                ->value('avg_response_time_ms');
-
-            $avgLatestResponseTimeMs = $latestAvg === null
-                ? null
-                : (int) round((float) $latestAvg);
-        }
+        $latestPass = $this->latestPassStats($addressIds, $scheduledOnly, $metric);
 
         return array_merge($base, [
             'runs_count' => $runsCount,
@@ -174,8 +157,8 @@ class CheckStats
             'avg_response_time_per_run_ms' => $this->averageFromValues(
                 $runBuckets->pluck('avg_response_time_ms')
             ),
-            'avg_latest_response_time_ms' => $avgLatestResponseTimeMs,
-            'latest_checks_count' => $latestChecksCount,
+            'avg_latest_response_time_ms' => $latestPass['avg_latest_response_time_ms'],
+            'latest_checks_count' => $latestPass['latest_checks_count'],
         ]);
     }
 
@@ -601,6 +584,84 @@ class CheckStats
         } catch (\Throwable) {
             return (string) $bucketAt;
         }
+    }
+
+    /**
+     * Average and address count for the latest check pass (one CheckRun, or
+     * one minute bucket for legacy snapshots without check_run_id).
+     *
+     * @param  Collection<int, int>  $addressIds
+     * @return array{avg_latest_response_time_ms: int|null, latest_checks_count: int}
+     */
+    private function latestPassStats(
+        Collection $addressIds,
+        bool $scheduledOnly,
+        ResponseTimeMetric $metric,
+    ): array {
+        $base = $this->snapshotsForSiteAddresses($addressIds, $scheduledOnly);
+        $latest = (clone $base)->orderByDesc('id')->first(['check_run_id', 'created_at']);
+
+        if ($latest === null) {
+            return [
+                'avg_latest_response_time_ms' => null,
+                'latest_checks_count' => 0,
+            ];
+        }
+
+        $this->constrainToLatestPass($base, $latest);
+
+        $row = $base
+            ->selectRaw('COUNT(*) as checks_count')
+            ->selectRaw($this->avgTimeSelectRaw($metric))
+            ->first();
+
+        $count = (int) ($row->checks_count ?? 0);
+
+        return [
+            'avg_latest_response_time_ms' => $count > 0
+                ? $this->nullableRoundedAvg($row->avg_response_time_ms ?? null)
+                : null,
+            'latest_checks_count' => $count,
+        ];
+    }
+
+    /**
+     * @param  Collection<int, int>  $addressIds
+     * @return Builder<Snapshot>
+     */
+    private function snapshotsForSiteAddresses(Collection $addressIds, bool $scheduledOnly): Builder
+    {
+        $query = Snapshot::query()->whereIn('address_id', $addressIds);
+
+        if (! $scheduledOnly) {
+            return $query;
+        }
+
+        return $query->where(function ($inner) {
+            $inner->whereNull('check_run_id')
+                ->orWhereIn('check_run_id', function ($sub) {
+                    $sub->select('id')
+                        ->from('check_runs')
+                        ->where('source', CheckRun::SOURCE_SCHEDULE);
+                });
+        });
+    }
+
+    /**
+     * @param  Builder<Snapshot>  $query
+     */
+    private function constrainToLatestPass(Builder $query, Snapshot $latest): void
+    {
+        if ($latest->check_run_id !== null) {
+            $query->where('check_run_id', $latest->check_run_id);
+
+            return;
+        }
+
+        $query->whereRaw(
+            $this->runBucketExpression().' = ?',
+            [$latest->created_at?->format('Y-m-d H:i') ?? ''],
+        );
     }
 
     /**
