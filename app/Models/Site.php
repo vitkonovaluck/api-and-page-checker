@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Carbon\CarbonInterface;
+use Database\Factories\SiteFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Support\Carbon;
 
 #[Fillable([
+    'user_id',
     'name',
     'base_url',
     'schedule_enabled',
@@ -21,6 +25,9 @@ use Illuminate\Support\Carbon;
 ])]
 class Site extends Model
 {
+    /** @use HasFactory<SiteFactory> */
+    use HasFactory;
+
     public const CHECKS_PER_MINUTE_MIN = 1;
 
     public const CHECKS_PER_MINUTE_MAX = 120;
@@ -81,6 +88,11 @@ class Site extends Model
     public function checkQueue(): string
     {
         return self::checkQueueName((int) $this->id);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function addresses(): HasMany

@@ -15,9 +15,16 @@ class SiteSettingsModalTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->actingAsUser();
+    }
+
     public function test_changing_schedule_settings_keeps_modal_open(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -32,7 +39,7 @@ class SiteSettingsModalTest extends TestCase
 
     public function test_changing_address_schedule_keeps_modal_open(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -51,7 +58,7 @@ class SiteSettingsModalTest extends TestCase
 
     public function test_close_action_hides_settings_modal(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -65,7 +72,7 @@ class SiteSettingsModalTest extends TestCase
 
     public function test_settings_modal_does_not_close_from_native_dialog_events(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);

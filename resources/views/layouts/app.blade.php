@@ -19,21 +19,36 @@
             <a href="{{ route('sites.index') }}" class="text-lg font-semibold tracking-tight text-slate-900" wire:navigate>
                 API Snapshot Checker
             </a>
-            <nav class="flex items-center gap-4 text-sm">
-                <a
-                    href="{{ route('sites.index') }}"
-                    wire:navigate
-                    class="{{ request()->routeIs('sites.*', 'addresses.*') ? 'font-medium text-slate-900' : 'text-slate-500 hover:text-slate-800' }}"
-                >
-                    Сайти
-                </a>
-                <a
-                    href="{{ route('settings.index') }}"
-                    wire:navigate
-                    class="{{ request()->routeIs('settings.*') ? 'font-medium text-slate-900' : 'text-slate-500 hover:text-slate-800' }}"
-                >
-                    Налаштування
-                </a>
+            <nav class="flex flex-wrap items-center gap-4 text-sm">
+                @auth
+                    <a
+                        href="{{ route('sites.index') }}"
+                        wire:navigate
+                        class="{{ request()->routeIs('sites.*', 'addresses.*') ? 'font-medium text-slate-900' : 'text-slate-500 hover:text-slate-800' }}"
+                    >
+                        Сайти
+                    </a>
+                    <a
+                        href="{{ route('settings.index') }}"
+                        wire:navigate
+                        class="{{ request()->routeIs('settings.*') ? 'font-medium text-slate-900' : 'text-slate-500 hover:text-slate-800' }}"
+                    >
+                        Налаштування
+                    </a>
+                    @if (auth()->user()->isAdmin())
+                        <a
+                            href="{{ url('/admincab') }}"
+                            class="text-slate-500 hover:text-slate-800"
+                        >
+                            Адмінка
+                        </a>
+                    @endif
+                    <span class="text-slate-500">{{ auth()->user()->name }}</span>
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit" class="text-slate-500 hover:text-slate-800">Вийти</button>
+                    </form>
+                @endauth
             </nav>
         </div>
     </header>

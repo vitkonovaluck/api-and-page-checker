@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -13,6 +14,8 @@ class ToastTest extends TestCase
 
     public function test_success_flash_is_rendered_as_toast(): void
     {
+        $this->actingAsUser();
+
         $this->withSession(['success' => 'Сайт створено.'])
             ->get(route('sites.index'))
             ->assertOk()
@@ -22,6 +25,8 @@ class ToastTest extends TestCase
 
     public function test_error_flash_is_rendered_as_toast(): void
     {
+        $this->actingAsUser();
+
         $this->withSession(['error' => 'Зараз уже виконується перевірка. Зачекайте завершення.'])
             ->get(route('sites.index'))
             ->assertOk()
@@ -30,6 +35,8 @@ class ToastTest extends TestCase
 
     public function test_validation_errors_are_rendered_as_toasts(): void
     {
+        $this->actingAs(User::factory()->admin()->create());
+
         $this->followingRedirects()
             ->from(route('settings.index'))
             ->post(route('settings.restore'))

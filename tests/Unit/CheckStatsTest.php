@@ -19,7 +19,7 @@ class CheckStatsTest extends TestCase
 
     public function test_computes_average_response_time_and_errors_for_address(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -43,7 +43,7 @@ class CheckStatsTest extends TestCase
 
     public function test_computes_average_errors_per_schedule_run(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Scheduled',
             'base_url' => 'https://api.example.com',
             'schedule_enabled' => true,
@@ -87,7 +87,7 @@ class CheckStatsTest extends TestCase
 
     public function test_computes_average_latest_response_time_for_site(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -115,7 +115,7 @@ class CheckStatsTest extends TestCase
 
     public function test_latest_average_uses_only_addresses_from_the_last_check_run(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -150,7 +150,7 @@ class CheckStatsTest extends TestCase
 
     public function test_latest_ttfb_average_uses_only_addresses_from_the_last_check_run(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -185,7 +185,7 @@ class CheckStatsTest extends TestCase
 
     public function test_averages_ttfb_from_timing_json(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -207,7 +207,7 @@ class CheckStatsTest extends TestCase
 
     public function test_address_chart_includes_total_and_ttfb_series(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -234,7 +234,7 @@ class CheckStatsTest extends TestCase
 
     public function test_address_chart_uses_selected_period_sample(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -260,7 +260,7 @@ class CheckStatsTest extends TestCase
 
     public function test_site_chart_averages_all_addresses_in_period(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -290,7 +290,9 @@ class CheckStatsTest extends TestCase
 
     public function test_site_and_address_pages_show_response_time_chart(): void
     {
-        $site = Site::query()->create([
+        $this->actingAsUser();
+
+        $site = Site::factory()->create([
             'name' => 'Chart Site',
             'base_url' => 'https://api.example.com',
         ]);
@@ -315,7 +317,9 @@ class CheckStatsTest extends TestCase
 
     public function test_site_page_shows_average_stats(): void
     {
-        $site = Site::query()->create([
+        $this->actingAsUser();
+
+        $site = Site::factory()->create([
             'name' => 'Stats Site',
             'base_url' => 'https://api.example.com',
             'schedule_enabled' => true,
@@ -348,7 +352,7 @@ class CheckStatsTest extends TestCase
 
     public function test_error_snapshots_for_site_lists_schedule_errors_only(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Errors',
             'base_url' => 'https://api.example.com',
             'schedule_enabled' => true,
@@ -383,7 +387,7 @@ class CheckStatsTest extends TestCase
 
     public function test_long_running_check_counts_as_single_run_and_chart_point(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Long run',
             'base_url' => 'https://api.example.com',
             'schedule_enabled' => true,
@@ -426,7 +430,7 @@ class CheckStatsTest extends TestCase
 
     public function test_manual_run_is_excluded_from_schedule_run_count(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Mixed',
             'base_url' => 'https://api.example.com',
             'schedule_enabled' => true,

@@ -17,13 +17,17 @@ class SettingsController extends Controller
 {
     public function __construct(private DatabaseBackupService $backups) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
-        return view('settings.index', $this->backups->viewData());
+        return view('settings.index', array_merge($this->backups->viewData(), [
+            'isAdmin' => $request->user()?->isAdmin() ?? false,
+        ]));
     }
 
-    public function backup(): BinaryFileResponse|RedirectResponse
+    public function backup(Request $request): BinaryFileResponse|RedirectResponse
     {
+        abort_unless($request->user()?->isAdmin() ?? false, 403);
+
         try {
             $backup = $this->backups->create();
         } catch (Throwable $e) {
@@ -43,6 +47,8 @@ class SettingsController extends Controller
 
     public function restore(Request $request): RedirectResponse
     {
+        abort_unless($request->user()?->isAdmin() ?? false, 403);
+
         $request->validate([
             'database' => ['required', 'file', 'max:102400'],
         ], [

@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ImportSitesRequest;
 use App\Models\Site;
+use App\Models\User;
 use App\Services\SiteTransferService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
@@ -18,6 +19,8 @@ final class SiteTransferController extends Controller
 
     public function export(Site $site): StreamedResponse
     {
+        $this->authorize('view', $site);
+
         $payload = $this->transfer->exportSite($site);
 
         return $this->download(
@@ -28,7 +31,7 @@ final class SiteTransferController extends Controller
 
     public function exportAll(): StreamedResponse
     {
-        $payload = $this->transfer->exportAll();
+        $payload = $this->transfer->exportAll($this->currentUser());
 
         return $this->download(
             $this->transfer->encode($payload),
@@ -46,7 +49,7 @@ final class SiteTransferController extends Controller
             ]);
         }
 
-        return $this->redirectAfterImport($this->transfer->importFile($path));
+        return $this->redirectAfterImport($this->transfer->importFile($path, $this->currentUser()));
     }
 
     /**
@@ -79,5 +82,13 @@ final class SiteTransferController extends Controller
             $filename,
             ['Content-Type' => 'application/json; charset=UTF-8'],
         );
+    }
+
+    private function currentUser(): User
+    {
+        $user = request()->user();
+        assert($user instanceof User);
+
+        return $user;
     }
 }

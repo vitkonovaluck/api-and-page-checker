@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Models\Site;
+use App\Models\User;
 use App\Services\SiteTransferService;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Livewire\Attributes\On;
@@ -32,6 +34,7 @@ class SiteSettingsModal extends Component
 
     public function mount(Site $site): void
     {
+        $this->authorize('update', $site);
         $this->site = $site;
         $this->fillFromSite();
     }
@@ -111,7 +114,12 @@ class SiteSettingsModal extends Component
 
     public function copy(SiteTransferService $transfer): void
     {
-        $copy = $transfer->copy($this->site);
+        $this->authorize('view', $this->site);
+
+        $user = Auth::user();
+        assert($user instanceof User);
+
+        $copy = $transfer->copy($this->site, $user);
 
         $this->show = false;
         session()->flash('success', 'Сайт скопійовано.');

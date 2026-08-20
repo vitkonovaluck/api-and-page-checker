@@ -6,6 +6,9 @@ use App\Livewire\Concerns\HandlesHttpMethodAndBody;
 use App\Livewire\Concerns\NormalizesEndpoint;
 use App\Livewire\Concerns\NormalizesRequestHeaders;
 use App\Models\Site;
+use App\Models\User;
+use App\Services\PlanQuota;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\On;
@@ -32,6 +35,7 @@ class CreateAddressModal extends Component
 
     public function mount(Site $site): void
     {
+        $this->authorize('update', $site);
         $this->site = $site;
     }
 
@@ -54,8 +58,10 @@ class CreateAddressModal extends Component
         $this->resetValidation();
     }
 
-    public function save(): void
+    public function save(PlanQuota $quota): void
     {
+        $this->authorize('update', $this->site);
+
         $parsed = $this->parseEndpoints($this->endpoints);
 
         if ($parsed === []) {
@@ -76,6 +82,8 @@ class CreateAddressModal extends Component
         $headers = $this->normalizeRequestHeaders($validated['headers'] ?? []);
         $body = $this->resolvedRequestBody();
         $name = count($parsed) === 1 ? ($validated['name'] ?: null) : null;
+
+        $quota->assertCanCreateAddresses($this->currentUser(), $this->site, count($parsed));
 
         DB::transaction(function () use ($parsed, $name, $headers, $body, $validated): void {
             foreach ($parsed as $endpoint) {
@@ -132,6 +140,14 @@ class CreateAddressModal extends Component
         }
 
         return $endpoints;
+    }
+
+    private function currentUser(): User
+    {
+        $user = Auth::user();
+        assert($user instanceof User);
+
+        return $user;
     }
 
     public function render()

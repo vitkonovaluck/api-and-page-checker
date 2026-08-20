@@ -52,11 +52,11 @@ class CheckingGuardTest extends TestCase
     {
         config(['queue.default' => 'database']);
 
-        $busySite = Site::query()->create([
+        $busySite = Site::factory()->create([
             'name' => 'Busy',
             'base_url' => 'https://busy.example.com',
         ]);
-        $idleSite = Site::query()->create([
+        $idleSite = Site::factory()->create([
             'name' => 'Idle',
             'base_url' => 'https://idle.example.com',
         ]);

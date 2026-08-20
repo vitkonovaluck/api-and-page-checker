@@ -1,8 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature;
 
+use App\Models\User;
 use App\Services\DatabaseBackupService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -10,6 +14,15 @@ use Tests\TestCase;
 
 class SettingsBackupTest extends TestCase
 {
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->actingAs(User::factory()->admin()->create());
+    }
+
     public function test_settings_page_shows_sqlite_backup_when_using_sqlite(): void
     {
         $this->get(route('settings.index'))
@@ -55,12 +68,14 @@ class SettingsBackupTest extends TestCase
     {
         $path = $this->useFileSqlite();
         $this->artisan('migrate');
+        $this->actingAs(User::factory()->admin()->create());
 
         try {
             $this->post(route('settings.backup'))
                 ->assertOk()
                 ->assertDownload();
         } finally {
+            $this->restoreDefaultSqlite();
             File::delete($path);
         }
     }
@@ -82,6 +97,7 @@ class SettingsBackupTest extends TestCase
     {
         $live = $this->useFileSqlite();
         $this->artisan('migrate');
+        $this->actingAs(User::factory()->admin()->create());
 
         $uploadPath = storage_path('framework/testing/settings-upload.sqlite');
         File::copy($live, $uploadPath);
@@ -94,6 +110,7 @@ class SettingsBackupTest extends TestCase
                 ->assertRedirect(route('settings.index'))
                 ->assertSessionHas('success');
         } finally {
+            $this->restoreDefaultSqlite();
             File::delete($live);
             File::delete($uploadPath);
         }
@@ -124,10 +141,21 @@ class SettingsBackupTest extends TestCase
         File::ensureDirectoryExists(dirname($path));
         File::put($path, '');
 
-        config(['database.connections.sqlite.database' => $path]);
-        DB::purge('sqlite');
-        DB::reconnect('sqlite');
+        $connection = config('database.connections.sqlite');
+        $connection['database'] = $path;
+
+        config([
+            'database.connections.sqlite_file' => $connection,
+            'database.default' => 'sqlite_file',
+        ]);
+        DB::purge('sqlite_file');
+        DB::reconnect('sqlite_file');
 
         return $path;
+    }
+
+    private function restoreDefaultSqlite(): void
+    {
+        config(['database.default' => 'sqlite']);
     }
 }
