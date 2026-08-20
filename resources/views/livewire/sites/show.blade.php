@@ -112,7 +112,7 @@
                         {{ $siteStats['avg_latest_response_time_ms'] !== null ? $siteStats['avg_latest_response_time_ms'].' ms' : '—' }}
                     </dd>
                     <p class="mt-1 text-xs text-slate-500">
-                        середнє по останніх знімках · {{ $siteStats['latest_checks_count'] }} адрес
+                        середнє за останній прохід · {{ $siteStats['latest_checks_count'] }} адрес
                     </p>
                 </div>
                 <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
