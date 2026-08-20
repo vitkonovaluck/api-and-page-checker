@@ -12,7 +12,7 @@ use Symfony\Component\Process\Process;
 
 #[Signature('sites:queue-work
             {--listen : Use queue:listen instead of queue:work}
-            {--tries=3 : Number of times to attempt a job}
+            {--tries=0 : Number of times to attempt a job (0 = use the job class)}
             {--timeout=90 : Seconds a child job may run}
             {--sleep=3 : Seconds to wait when no job is available}
             {--pretend : List per-site queues without starting workers}')]
@@ -52,7 +52,7 @@ class WorkSiteQueuesCommand extends Command
     public static function childArtisanArguments(
         int $siteId,
         bool $listen = false,
-        int $tries = 3,
+        int $tries = 0,
         int $timeout = 90,
         int $sleep = 3,
     ): array {

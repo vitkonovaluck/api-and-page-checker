@@ -8,6 +8,7 @@ use App\Models\Address;
 use App\Models\CheckRun;
 use App\Models\Site;
 use App\Services\SnapshotChecker;
+use DateTimeInterface;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Middleware\RateLimited;
@@ -18,7 +19,13 @@ class CheckAddressJob implements ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 3;
+    /**
+     * Rate-limit releases count as attempts. Keep this high enough that the
+     * tail of a site run can wait for rpm slots instead of dying at tries=3.
+     */
+    public int $tries = 25;
+
+    public int $maxExceptions = 3;
 
     public int $timeout = 90;
 
@@ -30,6 +37,11 @@ class CheckAddressJob implements ShouldQueue
     ) {
         $this->siteId = (int) $address->site_id;
         $this->onQueue(Site::checkQueueName($this->siteId));
+    }
+
+    public function retryUntil(): DateTimeInterface
+    {
+        return now()->addHours(2);
     }
 
     /**

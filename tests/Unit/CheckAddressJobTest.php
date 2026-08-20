@@ -155,6 +155,28 @@ class CheckAddressJobTest extends TestCase
         $this->assertInstanceOf(RateLimited::class, $middleware[0]);
     }
 
+    public function test_job_keeps_retrying_after_rate_limit_releases(): void
+    {
+        // Arrange
+        $site = Site::query()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/health',
+        ]);
+        $job = new CheckAddressJob($address);
+
+        // Act / Assert
+        $this->assertSame(25, $job->tries);
+        $this->assertSame(3, $job->maxExceptions);
+        $this->assertGreaterThan(
+            now()->addHour()->getTimestamp(),
+            $job->retryUntil()->getTimestamp(),
+        );
+    }
+
     public function test_job_passes_check_run_id_to_snapshot_checker(): void
     {
         config(['checking.delay_seconds' => 0]);

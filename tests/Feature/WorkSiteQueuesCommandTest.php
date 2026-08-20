@@ -41,6 +41,13 @@ class WorkSiteQueuesCommandTest extends TestCase
         $this->assertSame('--queue=site-12', $arguments[1]);
     }
 
+    public function test_child_worker_does_not_cap_attempts_so_rate_limited_jobs_can_retry(): void
+    {
+        $arguments = WorkSiteQueuesCommand::childArtisanArguments(12);
+
+        $this->assertContains('--tries=0', $arguments);
+    }
+
     public function test_check_job_is_dispatched_onto_the_site_queue(): void
     {
         Queue::fake();
@@ -73,6 +80,7 @@ class WorkSiteQueuesCommandTest extends TestCase
 
         $this->assertNotFalse($compose);
         $this->assertStringContainsString('sites:queue-work', $compose);
+        $this->assertStringContainsString('--tries=0', $compose);
         $this->assertDoesNotMatchRegularExpression('/artisan", "queue:work"/', $compose);
     }
 }
