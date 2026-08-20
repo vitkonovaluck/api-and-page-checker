@@ -1,11 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
+use App\Enums\DiffChangeType;
 use App\Models\Snapshot;
 
 class DiffService
 {
+    /**
+     * @var list<string>
+     */
+    private const LIST_IDENTITY_KEYS = ['id', 'slug', 'uuid', 'key', 'code'];
+
     /**
      * @return array{
      *     has_changes: bool,
@@ -111,11 +119,11 @@ class DiffService
             }
 
             if ($oldValue === null) {
-                $changes[] = ['key' => $key, 'type' => 'added', 'old' => null, 'new' => $newValue];
+                $changes[] = ['key' => $key, 'type' => DiffChangeType::Added->value, 'old' => null, 'new' => $newValue];
             } elseif ($newValue === null) {
-                $changes[] = ['key' => $key, 'type' => 'removed', 'old' => $oldValue, 'new' => null];
+                $changes[] = ['key' => $key, 'type' => DiffChangeType::Removed->value, 'old' => $oldValue, 'new' => null];
             } else {
-                $changes[] = ['key' => $key, 'type' => 'changed', 'old' => $oldValue, 'new' => $newValue];
+                $changes[] = ['key' => $key, 'type' => DiffChangeType::Changed->value, 'old' => $oldValue, 'new' => $newValue];
             }
         }
 
@@ -218,38 +226,13 @@ class DiffService
     private function walkJsonDiff(mixed $old, mixed $new, string $path, array &$changes): void
     {
         if (is_array($old) && is_array($new)) {
-            $oldIsList = array_is_list($old);
-            $newIsList = array_is_list($new);
-
-            if ($oldIsList && $newIsList) {
-                $max = max(count($old), count($new));
-                for ($i = 0; $i < $max; $i++) {
-                    $childPath = $path === '' ? "[$i]" : $path."[$i]";
-                    if (! array_key_exists($i, $old)) {
-                        $changes[] = ['path' => $childPath, 'type' => 'added', 'old' => null, 'new' => $new[$i]];
-                    } elseif (! array_key_exists($i, $new)) {
-                        $changes[] = ['path' => $childPath, 'type' => 'removed', 'old' => $old[$i], 'new' => null];
-                    } else {
-                        $this->walkJsonDiff($old[$i], $new[$i], $childPath, $changes);
-                    }
-                }
+            if (array_is_list($old) && array_is_list($new)) {
+                $this->diffJsonList($old, $new, $path, $changes);
 
                 return;
             }
 
-            $keys = array_unique(array_merge(array_keys($old), array_keys($new)));
-            sort($keys);
-
-            foreach ($keys as $key) {
-                $childPath = $path === '' ? (string) $key : $path.'.'.$key;
-                if (! array_key_exists($key, $old)) {
-                    $changes[] = ['path' => $childPath, 'type' => 'added', 'old' => null, 'new' => $new[$key]];
-                } elseif (! array_key_exists($key, $new)) {
-                    $changes[] = ['path' => $childPath, 'type' => 'removed', 'old' => $old[$key], 'new' => null];
-                } else {
-                    $this->walkJsonDiff($old[$key], $new[$key], $childPath, $changes);
-                }
-            }
+            $this->diffJsonObject($old, $new, $path, $changes);
 
             return;
         }
@@ -257,11 +240,350 @@ class DiffService
         if ($old !== $new) {
             $changes[] = [
                 'path' => $path === '' ? '$' : $path,
-                'type' => 'changed',
+                'type' => DiffChangeType::Changed->value,
                 'old' => $old,
                 'new' => $new,
             ];
         }
+    }
+
+    /**
+     * @param  array<string|int, mixed>  $old
+     * @param  array<string|int, mixed>  $new
+     * @param  list<array{path: string, type: string, old: mixed, new: mixed}>  $changes
+     */
+    private function diffJsonObject(array $old, array $new, string $path, array &$changes): void
+    {
+        $keys = array_unique(array_merge(array_keys($old), array_keys($new)));
+        sort($keys);
+
+        foreach ($keys as $key) {
+            $childPath = $path === '' ? (string) $key : $path.'.'.$key;
+
+            if (! array_key_exists($key, $old)) {
+                $changes[] = [
+                    'path' => $childPath,
+                    'type' => DiffChangeType::Added->value,
+                    'old' => null,
+                    'new' => $new[$key],
+                ];
+
+                continue;
+            }
+
+            if (! array_key_exists($key, $new)) {
+                $changes[] = [
+                    'path' => $childPath,
+                    'type' => DiffChangeType::Removed->value,
+                    'old' => $old[$key],
+                    'new' => null,
+                ];
+
+                continue;
+            }
+
+            $this->walkJsonDiff($old[$key], $new[$key], $childPath, $changes);
+        }
+    }
+
+    /**
+     * @param  list<mixed>  $old
+     * @param  list<mixed>  $new
+     * @param  list<array{path: string, type: string, old: mixed, new: mixed}>  $changes
+     */
+    private function diffJsonList(array $old, array $new, string $path, array &$changes): void
+    {
+        $identityKey = $this->listIdentityKey($old, $new);
+
+        if ($identityKey !== null) {
+            $this->diffKeyedList(
+                $this->indexByIdentity($old, $identityKey) ?? [],
+                $this->indexByIdentity($new, $identityKey) ?? [],
+                $this->identityValues($old, $identityKey),
+                $this->identityValues($new, $identityKey),
+                $path,
+                $identityKey,
+                $changes,
+            );
+
+            return;
+        }
+
+        if ($this->isUniqueScalarList($old) && $this->isUniqueScalarList($new)) {
+            $this->diffKeyedList(
+                $this->indexScalars($old),
+                $this->indexScalars($new),
+                $old,
+                $new,
+                $path,
+                '',
+                $changes,
+            );
+
+            return;
+        }
+
+        if ($this->isPureReorder($old, $new)) {
+            $changes[] = [
+                'path' => $this->jsonPath($path),
+                'type' => DiffChangeType::Reordered->value,
+                'old' => $old,
+                'new' => $new,
+            ];
+
+            return;
+        }
+
+        $this->diffListByIndex($old, $new, $path, $changes);
+    }
+
+    /**
+     * @param  array<string, mixed>  $oldById
+     * @param  array<string, mixed>  $newById
+     * @param  list<string|int>  $oldIds
+     * @param  list<string|int>  $newIds
+     * @param  list<array{path: string, type: string, old: mixed, new: mixed}>  $changes
+     */
+    private function diffKeyedList(
+        array $oldById,
+        array $newById,
+        array $oldIds,
+        array $newIds,
+        string $path,
+        string $key,
+        array &$changes,
+    ): void {
+        $oldCommon = [];
+        $newCommon = [];
+
+        foreach ($oldIds as $id) {
+            $idKey = (string) $id;
+
+            if (! array_key_exists($idKey, $newById)) {
+                $changes[] = [
+                    'path' => $this->listItemPath($path, $key, $id),
+                    'type' => DiffChangeType::Removed->value,
+                    'old' => $oldById[$idKey],
+                    'new' => null,
+                ];
+
+                continue;
+            }
+
+            $oldCommon[] = $id;
+        }
+
+        foreach ($newIds as $id) {
+            $idKey = (string) $id;
+
+            if (! array_key_exists($idKey, $oldById)) {
+                $changes[] = [
+                    'path' => $this->listItemPath($path, $key, $id),
+                    'type' => DiffChangeType::Added->value,
+                    'old' => null,
+                    'new' => $newById[$idKey],
+                ];
+
+                continue;
+            }
+
+            $newCommon[] = $id;
+        }
+
+        if ($oldCommon !== $newCommon) {
+            $changes[] = [
+                'path' => $this->jsonPath($path),
+                'type' => DiffChangeType::Reordered->value,
+                'old' => $oldIds,
+                'new' => $newIds,
+            ];
+        }
+
+        foreach ($oldCommon as $id) {
+            $idKey = (string) $id;
+
+            $this->walkJsonDiff(
+                $oldById[$idKey],
+                $newById[$idKey],
+                $this->listItemPath($path, $key, $id),
+                $changes,
+            );
+        }
+    }
+
+    /**
+     * @param  list<mixed>  $old
+     * @param  list<mixed>  $new
+     * @param  list<array{path: string, type: string, old: mixed, new: mixed}>  $changes
+     */
+    private function diffListByIndex(array $old, array $new, string $path, array &$changes): void
+    {
+        $max = max(count($old), count($new));
+
+        for ($i = 0; $i < $max; $i++) {
+            $childPath = $path === '' ? "[$i]" : $path."[$i]";
+
+            if (! array_key_exists($i, $old)) {
+                $changes[] = [
+                    'path' => $childPath,
+                    'type' => DiffChangeType::Added->value,
+                    'old' => null,
+                    'new' => $new[$i],
+                ];
+
+                continue;
+            }
+
+            if (! array_key_exists($i, $new)) {
+                $changes[] = [
+                    'path' => $childPath,
+                    'type' => DiffChangeType::Removed->value,
+                    'old' => $old[$i],
+                    'new' => null,
+                ];
+
+                continue;
+            }
+
+            $this->walkJsonDiff($old[$i], $new[$i], $childPath, $changes);
+        }
+    }
+
+    /**
+     * @param  list<mixed>  $old
+     * @param  list<mixed>  $new
+     */
+    private function listIdentityKey(array $old, array $new): ?string
+    {
+        foreach (self::LIST_IDENTITY_KEYS as $key) {
+            if ($this->indexByIdentity($old, $key) !== null && $this->indexByIdentity($new, $key) !== null) {
+                return $key;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  list<mixed>  $items
+     * @return array<string, array<string, mixed>>|null
+     */
+    private function indexByIdentity(array $items, string $key): ?array
+    {
+        $index = [];
+
+        foreach ($items as $item) {
+            if (! is_array($item) || ! array_key_exists($key, $item)) {
+                return null;
+            }
+
+            $value = $item[$key];
+
+            if ((! is_string($value) && ! is_int($value)) || $value === '') {
+                return null;
+            }
+
+            $id = (string) $value;
+
+            if (array_key_exists($id, $index)) {
+                return null;
+            }
+
+            $index[$id] = $item;
+        }
+
+        return $index;
+    }
+
+    /**
+     * @param  list<mixed>  $items
+     * @return list<string|int>
+     */
+    private function identityValues(array $items, string $key): array
+    {
+        $values = [];
+
+        foreach ($items as $item) {
+            $values[] = $item[$key];
+        }
+
+        return $values;
+    }
+
+    /**
+     * @param  list<mixed>  $items
+     */
+    private function isUniqueScalarList(array $items): bool
+    {
+        $seen = [];
+
+        foreach ($items as $item) {
+            if (! is_string($item) && ! is_int($item)) {
+                return false;
+            }
+
+            $id = (string) $item;
+
+            if ($id === '' || array_key_exists($id, $seen)) {
+                return false;
+            }
+
+            $seen[$id] = true;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param  list<string|int>  $items
+     * @return array<string, string|int>
+     */
+    private function indexScalars(array $items): array
+    {
+        $index = [];
+
+        foreach ($items as $item) {
+            $index[(string) $item] = $item;
+        }
+
+        return $index;
+    }
+
+    /**
+     * @param  list<mixed>  $old
+     * @param  list<mixed>  $new
+     */
+    private function isPureReorder(array $old, array $new): bool
+    {
+        if (count($old) !== count($new) || $old === $new) {
+            return false;
+        }
+
+        $oldEncoded = array_map($this->encodeItem(...), $old);
+        $newEncoded = array_map($this->encodeItem(...), $new);
+        sort($oldEncoded);
+        sort($newEncoded);
+
+        return $oldEncoded === $newEncoded;
+    }
+
+    private function encodeItem(mixed $item): string
+    {
+        return json_encode($item, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: serialize($item);
+    }
+
+    private function jsonPath(string $path): string
+    {
+        return $path === '' ? '$' : $path;
+    }
+
+    private function listItemPath(string $path, string $key, string|int $identity): string
+    {
+        $segment = $key === ''
+            ? '['.$identity.']'
+            : '['.$key.'='.$identity.']';
+
+        return $path === '' ? $segment : $path.$segment;
     }
 
     /**
