@@ -18,11 +18,11 @@ class WorkSiteQueuesCommandTest extends TestCase
 
     public function test_pretend_lists_a_queue_name_per_site(): void
     {
-        $alpha = Site::query()->create([
+        $alpha = Site::factory()->create([
             'name' => 'Alpha',
             'base_url' => 'https://alpha.example.com',
         ]);
-        $beta = Site::query()->create([
+        $beta = Site::factory()->create([
             'name' => 'Beta',
             'base_url' => 'https://beta.example.com',
         ]);
@@ -51,8 +51,9 @@ class WorkSiteQueuesCommandTest extends TestCase
     public function test_check_job_is_dispatched_onto_the_site_queue(): void
     {
         Queue::fake();
+        $this->actingAsUser();
 
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Queued',
             'base_url' => 'https://api.example.com',
         ]);
@@ -69,6 +70,8 @@ class WorkSiteQueuesCommandTest extends TestCase
 
     public function test_settings_page_documents_per_site_workers(): void
     {
+        $this->actingAsUser();
+
         $this->get(route('settings.index'))
             ->assertOk()
             ->assertSee('sites:queue-work');

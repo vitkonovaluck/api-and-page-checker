@@ -31,7 +31,7 @@ class CheckAddressJobTest extends TestCase
 
     public function test_job_runs_snapshot_checker_for_address(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -53,7 +53,7 @@ class CheckAddressJobTest extends TestCase
 
     public function test_job_is_assigned_to_the_site_queue(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -78,7 +78,7 @@ class CheckAddressJobTest extends TestCase
             'checking.too_many_requests_backoff_ms' => 1,
         ]);
 
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -113,7 +113,7 @@ class CheckAddressJobTest extends TestCase
             'checking.requests_per_minute' => 0,
         ]);
 
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
             'requests_per_minute' => 120,
@@ -140,7 +140,7 @@ class CheckAddressJobTest extends TestCase
 
     public function test_job_uses_rate_limited_middleware(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -158,7 +158,7 @@ class CheckAddressJobTest extends TestCase
     public function test_job_keeps_retrying_after_rate_limit_releases(): void
     {
         // Arrange
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -181,7 +181,7 @@ class CheckAddressJobTest extends TestCase
     {
         config(['checking.delay_seconds' => 0]);
 
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -203,7 +203,7 @@ class CheckAddressJobTest extends TestCase
     {
         config(['checking.delay_seconds' => 0]);
 
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -231,7 +231,7 @@ class CheckAddressJobTest extends TestCase
         Carbon::setTestNow('2026-08-19 12:00:00');
         config(['checking.delay_seconds' => 0, 'checking.chain_delay_seconds' => 60]);
 
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
             'schedule_enabled' => true,

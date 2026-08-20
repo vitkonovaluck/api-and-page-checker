@@ -23,7 +23,7 @@ class RestartSiteCheckJobTest extends TestCase
     {
         Queue::fake();
 
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
             'schedule_enabled' => true,
@@ -51,7 +51,7 @@ class RestartSiteCheckJobTest extends TestCase
     {
         Queue::fake();
 
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
             'schedule_enabled' => true,
@@ -72,7 +72,7 @@ class RestartSiteCheckJobTest extends TestCase
     {
         Queue::fake();
 
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
             'schedule_enabled' => true,
@@ -95,7 +95,7 @@ class RestartSiteCheckJobTest extends TestCase
     {
         config(['queue.default' => 'database']);
 
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Chained',
             'base_url' => 'https://chain.example.com',
             'schedule_enabled' => true,
@@ -107,7 +107,7 @@ class RestartSiteCheckJobTest extends TestCase
             'schedule_enabled' => true,
         ]);
 
-        $other = Site::query()->create([
+        $other = Site::factory()->create([
             'name' => 'Busy',
             'base_url' => 'https://busy.example.com',
         ]);

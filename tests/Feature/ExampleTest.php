@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -9,13 +11,18 @@ class ExampleTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * A basic test example.
-     */
-    public function test_the_application_returns_a_successful_response(): void
+    public function test_guests_can_view_the_home_landing_page(): void
     {
-        $response = $this->get('/');
+        $this->get('/')
+            ->assertOk()
+            ->assertSee(__('landing.hero_title'));
+    }
 
-        $response->assertStatus(200);
+    public function test_authenticated_users_can_view_the_sites_index(): void
+    {
+        $this->actingAsUser();
+
+        $this->get(route('sites.index'))
+            ->assertOk();
     }
 }

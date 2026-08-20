@@ -31,6 +31,13 @@ class ApiSnapshotCheckerTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->actingAsUser();
+    }
+
     protected function tearDown(): void
     {
         Carbon::setTestNow();
@@ -39,7 +46,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_index_shows_sites_page(): void
     {
-        $this->get('/')
+        $this->get(route('sites.index'))
             ->assertOk()
             ->assertSee('Список сайтів')
             ->assertSeeLivewire(CreateSiteModal::class);
@@ -66,7 +73,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_can_check_single_address_and_detect_json_changes(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -106,7 +113,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_check_all_site_addresses_creates_snapshot_for_each(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Multi',
             'base_url' => 'https://api.example.com',
         ]);
@@ -138,7 +145,7 @@ class ApiSnapshotCheckerTest extends TestCase
     {
         Queue::fake();
 
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Queued manual',
             'base_url' => 'https://api.example.com',
         ]);
@@ -165,7 +172,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_manual_check_is_blocked_while_another_check_is_running(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -193,7 +200,7 @@ class ApiSnapshotCheckerTest extends TestCase
         Carbon::setTestNow(Carbon::parse('2026-08-07 10:15:00'));
         Queue::fake();
 
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Scheduled',
             'base_url' => 'https://api.example.com',
             'schedule_enabled' => true,
@@ -219,11 +226,11 @@ class ApiSnapshotCheckerTest extends TestCase
     {
         config(['queue.default' => 'database']);
 
-        $busySite = Site::query()->create([
+        $busySite = Site::factory()->create([
             'name' => 'Busy Shop',
             'base_url' => 'https://busy.example.com',
         ]);
-        $idleSite = Site::query()->create([
+        $idleSite = Site::factory()->create([
             'name' => 'Idle Shop',
             'base_url' => 'https://idle.example.com',
         ]);
@@ -251,7 +258,7 @@ class ApiSnapshotCheckerTest extends TestCase
     {
         config(['queue.default' => 'database']);
 
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Busy Shop',
             'base_url' => 'https://busy.example.com',
         ]);
@@ -273,7 +280,7 @@ class ApiSnapshotCheckerTest extends TestCase
     {
         config(['queue.default' => 'database']);
 
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Busy Shop',
             'base_url' => 'https://busy.example.com',
         ]);
@@ -295,11 +302,11 @@ class ApiSnapshotCheckerTest extends TestCase
     {
         config(['queue.default' => 'database']);
 
-        $busySite = Site::query()->create([
+        $busySite = Site::factory()->create([
             'name' => 'Busy',
             'base_url' => 'https://busy.example.com',
         ]);
-        $idleSite = Site::query()->create([
+        $idleSite = Site::factory()->create([
             'name' => 'Idle',
             'base_url' => 'https://idle.example.com',
         ]);
@@ -324,7 +331,7 @@ class ApiSnapshotCheckerTest extends TestCase
     {
         config(['queue.default' => 'database']);
 
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Busy',
             'base_url' => 'https://busy.example.com',
         ]);
@@ -343,7 +350,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_check_all_with_no_addresses_shows_message(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Empty',
             'base_url' => 'https://api.example.com',
         ]);
@@ -355,7 +362,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_can_copy_site_without_snapshots(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Original',
             'base_url' => 'https://api.example.com',
             'schedule_enabled' => true,
@@ -404,7 +411,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_can_set_site_checks_per_minute_in_settings(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -421,7 +428,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_can_enable_chain_checks_in_settings(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -445,7 +452,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_enabling_schedule_checkbox_saves_without_changing_period(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -470,7 +477,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_site_settings_reject_checks_per_minute_below_minimum(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -485,7 +492,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_can_create_address_with_request_headers(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -514,7 +521,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_can_bulk_create_addresses_with_shared_method_headers_and_body(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -545,7 +552,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_bulk_create_rejects_duplicate_endpoints_in_list(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -562,7 +569,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_bulk_create_allows_existing_endpoints_with_different_request_options(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -597,7 +604,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_create_address_rejects_empty_endpoints_and_keeps_modal_open(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -614,7 +621,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_can_update_address_request_headers(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -640,7 +647,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_can_update_address_method_and_body(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -671,7 +678,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_response_time_chart_modal_switches_period(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -715,7 +722,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_site_page_can_switch_displayed_times_to_ttfb(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'TTFB Site',
             'base_url' => 'https://api.example.com',
         ]);
@@ -771,7 +778,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_address_page_switches_displayed_times_to_ttfb_without_changing_chart(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'TTFB Address',
             'base_url' => 'https://api.example.com',
         ]);
@@ -819,7 +826,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_error_snapshots_modal_lists_failed_schedule_requests(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
             'schedule_enabled' => true,
@@ -852,7 +859,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_address_list_modal_lists_site_endpoints(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -885,7 +892,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_check_sends_custom_request_headers(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -917,7 +924,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_check_sends_post_with_request_body(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -954,7 +961,7 @@ class ApiSnapshotCheckerTest extends TestCase
     {
         Carbon::setTestNow(Carbon::parse('2026-08-07 10:15:00'));
 
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Scheduled',
             'base_url' => 'https://api.example.com',
             'schedule_enabled' => true,
@@ -992,7 +999,7 @@ class ApiSnapshotCheckerTest extends TestCase
         Carbon::setTestNow(Carbon::parse('2026-08-07 10:15:00'));
         Queue::fake();
 
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Queued',
             'base_url' => 'https://api.example.com',
             'schedule_enabled' => true,
@@ -1026,7 +1033,7 @@ class ApiSnapshotCheckerTest extends TestCase
     {
         Carbon::setTestNow(Carbon::parse('2026-08-07 10:15:00'));
 
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Scheduled',
             'base_url' => 'https://api.example.com',
             'schedule_enabled' => true,
@@ -1054,7 +1061,7 @@ class ApiSnapshotCheckerTest extends TestCase
     {
         Carbon::setTestNow(Carbon::parse('2026-08-07 10:07:00'));
 
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Aligned',
             'base_url' => 'https://api.example.com',
             'schedule_enabled' => true,
@@ -1085,12 +1092,12 @@ class ApiSnapshotCheckerTest extends TestCase
     {
         $this->get('/settings')
             ->assertOk()
-            ->assertSee('Бекап бази даних');
+            ->assertSee('Експорт сайтів');
     }
 
     public function test_can_delete_snapshot(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -1116,7 +1123,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_can_clear_all_site_snapshots_from_settings(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Demo',
             'base_url' => 'https://api.example.com',
         ]);
@@ -1140,7 +1147,7 @@ class ApiSnapshotCheckerTest extends TestCase
             ]);
         }
 
-        $otherSite = Site::query()->create([
+        $otherSite = Site::factory()->create([
             'name' => 'Other',
             'base_url' => 'https://other.example.com',
         ]);
@@ -1168,7 +1175,7 @@ class ApiSnapshotCheckerTest extends TestCase
 
     public function test_site_show_highlights_changed_status_with_previous(): void
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => 'Status Change',
             'base_url' => 'https://api.example.com',
         ]);

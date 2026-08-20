@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Models\Site;
+use App\Models\User;
 use App\Services\CheckingGuard;
+use App\Services\PlanQuota;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -27,6 +30,8 @@ class Index extends Component
 
     public function delete(Site $site): void
     {
+        $this->authorize('delete', $site);
+
         $site->delete();
 
         session()->flash('success', 'Сайт видалено.');
@@ -38,17 +43,24 @@ class Index extends Component
         $this->syncBusyState($guard);
     }
 
-    public function render(CheckingGuard $guard): View
+    public function render(CheckingGuard $guard, PlanQuota $quota): View
     {
-        $this->syncBusyState($guard);
-
-        $sites = Site::query()
+        $user = $this->currentUser();
+        $sites = $user->sites()
             ->withCount('addresses')
             ->with(['addresses' => fn ($q) => $q->orderByDesc('last_checked_at')])
             ->orderByDesc('updated_at')
             ->get();
 
-        return view('livewire.sites.index', compact('sites'));
+        $this->syncBusyState($guard, $sites->modelKeys());
+        $usage = $quota->siteUsage($user);
+
+        return view('livewire.sites.index', [
+            'sites' => $sites,
+            'canCreateSite' => $usage['can_create_site'],
+            'sitesUsed' => $usage['sites_used'],
+            'sitesMax' => $usage['sites_max'],
+        ]);
     }
 
     public function checksBusy(): bool
@@ -56,9 +68,20 @@ class Index extends Component
         return $this->checksBusy;
     }
 
-    private function syncBusyState(CheckingGuard $guard): void
+    /**
+     * @param  list<int|string>  $siteIds
+     */
+    private function syncBusyState(CheckingGuard $guard, array $siteIds = []): void
     {
-        $this->busySiteIds = $guard->busySiteIds();
+        $this->busySiteIds = $guard->busySiteIdsAmong(array_map(intval(...), $siteIds));
         $this->checksBusy = $this->busySiteIds !== [];
+    }
+
+    private function currentUser(): User
+    {
+        $user = Auth::user();
+        assert($user instanceof User);
+
+        return $user;
     }
 }

@@ -20,6 +20,13 @@ class SiteTransferTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->actingAsUser();
+    }
+
     protected function tearDown(): void
     {
         Carbon::setTestNow();
@@ -191,7 +198,10 @@ class SiteTransferTest extends TestCase
             $site->delete();
             $this->assertSame(0, Site::query()->count());
 
-            $this->artisan('sites:import', ['file' => $path])
+            $this->artisan('sites:import', [
+                'file' => $path,
+                '--user' => $site->user->email,
+            ])
                 ->assertSuccessful();
 
             $imported = Site::query()->first();
@@ -211,7 +221,7 @@ class SiteTransferTest extends TestCase
 
     private function makeSite(string $name = 'Demo Shop', string $baseUrl = 'https://api.example.com'): Site
     {
-        $site = Site::query()->create([
+        $site = Site::factory()->create([
             'name' => $name,
             'base_url' => $baseUrl,
             'schedule_enabled' => true,

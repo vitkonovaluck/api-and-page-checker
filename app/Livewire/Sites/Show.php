@@ -27,6 +27,7 @@ class Show extends Component
 
     public function mount(Site $site, CheckingGuard $guard): void
     {
+        $this->authorize('view', $site);
         $this->site = $site;
         $this->syncBusyState($guard);
         $this->hydrateResponseTimeMetric();
@@ -34,6 +35,8 @@ class Show extends Component
 
     public function deleteAddress(int $addressId): void
     {
+        $this->authorize('update', $this->site);
+
         $address = Address::query()
             ->where('site_id', $this->site->id)
             ->whereKey($addressId)

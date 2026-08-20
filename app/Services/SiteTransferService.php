@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Address;
 use App\Models\Site;
+use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -17,6 +18,8 @@ use JsonException;
 final class SiteTransferService
 {
     public const FORMAT = 'api-checker-sites';
+
+    public function __construct(private PlanQuota $quota) {}
 
     /**
      * @return array{format: string, version: int, exported_at: string, sites: list<array<string, mixed>>}
@@ -31,12 +34,17 @@ final class SiteTransferService
     /**
      * @return array{format: string, version: int, exported_at: string, sites: list<array<string, mixed>>}
      */
-    public function exportAll(): array
+    public function exportAll(?User $user = null): array
     {
-        $sites = Site::query()
+        $query = Site::query()
             ->with(['addresses' => fn ($query) => $query->orderBy('id')])
-            ->orderBy('id')
-            ->get();
+            ->orderBy('id');
+
+        if ($user !== null) {
+            $query->where('user_id', $user->id);
+        }
+
+        $sites = $query->get();
 
         return $this->wrapPayload($sites->map($this->siteToArray(...))->all());
     }
@@ -64,32 +72,36 @@ final class SiteTransferService
         return 'sites-export-'.now()->format('Y-m-d').'.json';
     }
 
-    public function copy(Site $site): Site
+    public function copy(Site $site, User $user): Site
     {
         $site->load(['addresses' => fn ($query) => $query->orderBy('id')]);
+
+        $this->quota->assertCanCreateSite($user);
+        $this->quota->assertCanCreateAddressesOnNewSite($user, $site->addresses->count());
 
         $payload = $this->siteToArray($site);
         $payload['name'] = $site->name.' (копія)';
 
-        return DB::transaction(fn (): Site => $this->createSite($payload));
+        return DB::transaction(fn (): Site => $this->createSite($payload, $user));
     }
 
     /**
      * @return Collection<int, Site>
      */
-    public function importJson(string $json): Collection
+    public function importJson(string $json, User $user): Collection
     {
         $sites = $this->validatedSites($this->decodePayload($json));
+        $this->quota->assertCanImport($user, $sites);
 
-        return DB::transaction(function () use ($sites) {
-            return collect($sites)->map(fn (array $site): Site => $this->createSite($site));
+        return DB::transaction(function () use ($sites, $user) {
+            return collect($sites)->map(fn (array $site): Site => $this->createSite($site, $user));
         });
     }
 
     /**
      * @return Collection<int, Site>
      */
-    public function importFile(string $path): Collection
+    public function importFile(string $path, User $user): Collection
     {
         $json = file_get_contents($path);
         if ($json === false) {
@@ -98,7 +110,7 @@ final class SiteTransferService
             ]);
         }
 
-        return $this->importJson($json);
+        return $this->importJson($json, $user);
     }
 
     /**
@@ -337,9 +349,9 @@ final class SiteTransferService
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function createSite(array $payload): Site
+    private function createSite(array $payload, User $user): Site
     {
-        $site = Site::query()->create([
+        $site = $user->sites()->create([
             'name' => $payload['name'],
             'base_url' => rtrim((string) $payload['base_url'], '/'),
             'schedule_enabled' => (bool) ($payload['schedule_enabled'] ?? false),

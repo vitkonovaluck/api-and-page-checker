@@ -1,9 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Sites;
 
 use App\Livewire\Concerns\NormalizesEndpoint;
 use App\Models\Site;
+use App\Models\User;
+use App\Services\PlanQuota;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -41,16 +46,22 @@ class CreateSiteModal extends Component
         $this->resetValidation();
     }
 
-    public function save(): void
+    public function save(PlanQuota $quota): void
     {
-        $validated = $this->validate();
+        $this->authorize('create', Site::class);
 
-        $site = Site::query()->create([
+        $validated = $this->validate();
+        $user = $this->currentUser();
+
+        $quota->assertCanCreateSite($user);
+
+        $site = $user->sites()->create([
             'name' => $validated['name'],
             'base_url' => rtrim($validated['base_url'], '/'),
         ]);
 
         if (! empty($validated['endpoint'])) {
+            $quota->assertCanCreateAddresses($user, $site, 1);
             $site->addresses()->create([
                 'name' => $validated['address_name'] ?: null,
                 'endpoint' => $this->normalizeEndpoint($validated['endpoint']),
@@ -65,5 +76,13 @@ class CreateSiteModal extends Component
     public function render()
     {
         return view('livewire.sites.create-site-modal');
+    }
+
+    private function currentUser(): User
+    {
+        $user = Auth::user();
+        assert($user instanceof User);
+
+        return $user;
     }
 }

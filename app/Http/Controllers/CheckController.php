@@ -21,6 +21,7 @@ class CheckController extends Controller
         CheckingGuard $guard,
     ): RedirectResponse {
         abort_unless($address->site_id === $site->id, 404);
+        $this->authorize('update', $site);
 
         $redirect = $guard->runManual($site->id, function () use ($site, $address, $checker) {
             $run = CheckRun::start($site, CheckRun::SOURCE_MANUAL);
@@ -44,6 +45,8 @@ class CheckController extends Controller
 
     public function storeAll(Site $site, CheckingGuard $guard): RedirectResponse
     {
+        $this->authorize('update', $site);
+
         $redirect = $guard->runManual($site->id, function () use ($site) {
             $addresses = $site->addresses()->orderBy('id')->get();
 
