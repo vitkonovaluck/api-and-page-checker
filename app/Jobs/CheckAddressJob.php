@@ -38,11 +38,7 @@ class CheckAddressJob implements ShouldQueue
     public static function dispatchForSite(Site $site, string $source, iterable $addresses): CheckRun
     {
         $addressList = Collection::make($addresses);
-        $run = CheckRun::start($site, $source);
-
-        if ($addressList->isNotEmpty()) {
-            RestartSiteCheckJob::rememberRemaining((int) $run->id, $addressList->count());
-        }
+        $run = CheckRun::start($site, $source, $addressList->count());
 
         foreach ($addressList as $address) {
             self::dispatch($address, $run->id);

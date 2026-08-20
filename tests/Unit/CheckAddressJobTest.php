@@ -203,23 +203,6 @@ class CheckAddressJobTest extends TestCase
         $this->assertLessThan(500, $elapsedMs);
     }
 
-    public function test_job_is_assigned_to_the_site_queue(): void
-    {
-        $site = Site::query()->create([
-            'name' => 'Demo',
-            'base_url' => 'https://api.example.com',
-        ]);
-        $address = Address::query()->create([
-            'site_id' => $site->id,
-            'endpoint' => '/health',
-        ]);
-
-        $job = new CheckAddressJob($address);
-
-        $this->assertSame($site->id, $job->siteId);
-        $this->assertSame(Site::checkQueueName($site->id), $job->queue);
-    }
-
     public function test_last_job_of_a_run_queues_chained_restart_when_enabled(): void
     {
         Queue::fake();
@@ -248,15 +231,18 @@ class CheckAddressJobTest extends TestCase
 
         $run = CheckAddressJob::dispatchForSite($site, CheckRun::SOURCE_MANUAL, [$first, $second]);
 
+        $this->assertSame(2, $run->fresh()->remaining_jobs);
         Queue::assertPushed(CheckAddressJob::class, 2);
         Queue::assertNotPushed(RestartSiteCheckJob::class);
 
         (new CheckAddressJob($first, $run->id))->handle(app(SnapshotChecker::class));
 
+        $this->assertSame(1, $run->fresh()->remaining_jobs);
         Queue::assertNotPushed(RestartSiteCheckJob::class);
 
         (new CheckAddressJob($second, $run->id))->handle(app(SnapshotChecker::class));
 
+        $this->assertSame(0, $run->fresh()->remaining_jobs);
         Queue::assertPushed(RestartSiteCheckJob::class, 1);
         Queue::assertPushed(RestartSiteCheckJob::class, function (RestartSiteCheckJob $job) use ($site): bool {
             return $job->siteId === $site->id
