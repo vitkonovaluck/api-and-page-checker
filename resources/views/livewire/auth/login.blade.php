@@ -1,11 +1,13 @@
 <dialog
+    wire:ignore.self
     x-data
-    x-effect="$wire.show ? $el.showModal() : ($el.open && $el.close())"
+    x-effect="$wire.show ? ($el.open || $el.showModal()) : ($el.open && $el.close())"
+    x-on:cancel.prevent="$wire.close()"
+    x-on:close="if ($wire.show) { $nextTick(() => { if ($wire.show && ! $el.open) { $el.showModal() } }) }"
     @click="if ($event.target === $el) $wire.close()"
-    @close="if ($wire.show) $wire.close()"
     class="w-[calc(100%-2rem)] max-w-md rounded-2xl border border-white/10 bg-zinc-900 p-0 text-zinc-100 shadow-2xl backdrop:bg-zinc-950/70"
 >
-    <form wire:submit="login" class="flex max-h-[85vh] flex-col">
+    <form wire:submit.prevent="login" method="post" class="flex max-h-[85vh] flex-col">
         <div class="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
             <div>
                 <h2 class="text-base font-semibold text-white">Вхід</h2>

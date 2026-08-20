@@ -87,7 +87,7 @@
                 <p class="min-w-0 flex-1 leading-5" x-text="toast.message"></p>
                 <button
                     type="button"
-                    class="rounded-md p-1 text-current/70 hover:bg-black/5 hover:text-current focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                    class="rounded-md p-1 text-current/70 hover:bg-white/10 hover:text-current focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                     aria-label="{{ $closeLabel }}"
                     @click="dismiss(toast.id)"
                 >

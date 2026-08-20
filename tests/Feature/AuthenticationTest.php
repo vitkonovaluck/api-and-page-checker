@@ -102,6 +102,22 @@ class AuthenticationTest extends TestCase
         $this->assertAuthenticatedAs($user);
     }
 
+    public function test_invalid_login_credentials_show_an_error(): void
+    {
+        User::factory()->create([
+            'email' => 'member@example.com',
+            'password' => 'password',
+        ]);
+
+        Livewire::test(Login::class)
+            ->set('email', 'member@example.com')
+            ->set('password', 'wrong-password')
+            ->call('login')
+            ->assertHasErrors(['email']);
+
+        $this->assertGuest();
+    }
+
     public function test_social_only_users_cannot_log_in_with_password(): void
     {
         User::factory()->socialOnly()->create([

@@ -1,6 +1,6 @@
 const SERIES_COLORS = {
-    total: '#0f766e',
-    ttfb: '#c2410c',
+    total: '#22d3ee',
+    ttfb: '#fcd34d',
 };
 
 export function initResponseTimeChart(root, chart) {
@@ -45,7 +45,7 @@ export function initResponseTimeChart(root, chart) {
         line.setAttribute('x2', String(width - pad.right));
         line.setAttribute('y1', String(y));
         line.setAttribute('y2', String(y));
-        line.setAttribute('stroke', '#e2e8f0');
+        line.setAttribute('stroke', 'rgba(255, 255, 255, 0.08)');
         line.setAttribute('stroke-width', '1');
         svg.appendChild(line);
 
@@ -53,7 +53,7 @@ export function initResponseTimeChart(root, chart) {
         text.setAttribute('x', String(pad.left - 8));
         text.setAttribute('y', String(y + 4));
         text.setAttribute('text-anchor', 'end');
-        text.setAttribute('fill', '#64748b');
+        text.setAttribute('fill', '#a1a1aa');
         text.setAttribute('font-size', '11');
         text.textContent = value + ' ms';
         svg.appendChild(text);
@@ -66,7 +66,7 @@ export function initResponseTimeChart(root, chart) {
         text.setAttribute('x', String(xAt(i)));
         text.setAttribute('y', String(height - 16));
         text.setAttribute('text-anchor', 'middle');
-        text.setAttribute('fill', '#64748b');
+        text.setAttribute('fill', '#a1a1aa');
         text.setAttribute('font-size', '10');
         text.textContent = label;
         svg.appendChild(text);
@@ -75,7 +75,7 @@ export function initResponseTimeChart(root, chart) {
     drawLegend(svg, ns, series, pad.left);
 
     const tooltip = document.createElement('div');
-    tooltip.className = 'pointer-events-none absolute z-10 hidden rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 shadow-md';
+    tooltip.className = 'pointer-events-none absolute z-10 hidden rounded-md border border-white/10 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-200 shadow-xl';
     root.style.position = 'relative';
     root.appendChild(tooltip);
 
@@ -133,7 +133,7 @@ function drawLegend(svg, ns, series, left) {
         const text = document.createElementNS(ns, 'text');
         text.setAttribute('x', String(x + 22));
         text.setAttribute('y', '20');
-        text.setAttribute('fill', '#334155');
+        text.setAttribute('fill', '#e4e4e7');
         text.setAttribute('font-size', '12');
         text.textContent = item.label;
         svg.appendChild(text);
@@ -168,7 +168,7 @@ function drawSeriesPoints(svg, ns, item, labels, counts, xAt, yAt, showTip, hide
         circle.setAttribute('cy', String(yAt(value)));
         circle.setAttribute('r', '4');
         circle.setAttribute('fill', item.color);
-        circle.setAttribute('stroke', '#fff');
+        circle.setAttribute('stroke', '#09090b');
         circle.setAttribute('stroke-width', '1.5');
         circle.style.cursor = 'pointer';
         const html = pointTooltipHtml(item, labels[i], value, counts[i]);
@@ -204,7 +204,7 @@ function contiguousSegments(values) {
 
 function pointTooltipHtml(item, label, value, count) {
     return `<strong>${item.label}</strong><br>${label}: ${value} ms` +
-        (count ? `<br><span class="text-slate-500">${count} перевірок</span>` : '');
+        (count ? `<br><span class="text-zinc-400">${count} перевірок</span>` : '');
 }
 
 window.initResponseTimeChart = initResponseTimeChart;

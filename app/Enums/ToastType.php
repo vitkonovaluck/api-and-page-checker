@@ -28,10 +28,10 @@ enum ToastType: string
     public function containerClass(): string
     {
         return match ($this) {
-            self::Success => 'border border-emerald-200 border-l-4 border-l-emerald-500 bg-emerald-50 text-emerald-900',
-            self::Error => 'border border-red-200 border-l-4 border-l-red-500 bg-red-50 text-red-900',
-            self::Warning => 'border border-amber-200 border-l-4 border-l-amber-500 bg-amber-50 text-amber-900',
-            self::Info => 'border border-sky-200 border-l-4 border-l-sky-500 bg-sky-50 text-sky-900',
+            self::Success => 'border border-emerald-400/20 border-l-4 border-l-emerald-400 bg-emerald-400/10 text-emerald-100',
+            self::Error => 'border border-rose-400/20 border-l-4 border-l-rose-400 bg-rose-400/10 text-rose-100',
+            self::Warning => 'border border-amber-300/20 border-l-4 border-l-amber-300 bg-amber-300/10 text-amber-100',
+            self::Info => 'border border-cyan-400/20 border-l-4 border-l-cyan-400 bg-cyan-400/10 text-cyan-100',
         };
     }
 
