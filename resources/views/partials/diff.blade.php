@@ -15,11 +15,7 @@
         return (string) $value;
     };
 
-    $typeLabels = [
-        'added' => 'додано',
-        'removed' => 'видалено',
-        'changed' => 'змінено',
-    ];
+    $typeLabels = \App\Enums\DiffChangeType::labels();
 @endphp
 
 <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm {{ session('diff_highlight') ? 'ring-2 ring-amber-300' : '' }}">
