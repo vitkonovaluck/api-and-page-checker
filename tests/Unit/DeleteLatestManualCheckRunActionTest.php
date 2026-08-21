@@ -153,6 +153,24 @@ class DeleteLatestManualCheckRunActionTest extends TestCase
         $this->assertModelExists($otherSnapshot);
     }
 
+    public function test_deletes_snapshots_in_configured_chunks(): void
+    {
+        config(['checking.snapshot_delete_chunk' => 1]);
+
+        $site = $this->makeSite();
+        [$first, $second] = $this->makeAddresses($site);
+
+        $run = CheckRun::start($site, CheckRun::SOURCE_MANUAL);
+        $this->createSnapshot($first, $run->id, '2026-08-21 11:00:00');
+        $this->createSnapshot($second, $run->id, '2026-08-21 11:00:01');
+
+        $deleted = app(DeleteLatestManualCheckRunAction::class)->execute($site);
+
+        $this->assertSame(2, $deleted);
+        $this->assertModelMissing($run);
+        $this->assertSame(0, $site->snapshots()->count());
+    }
+
     private function makeSite(): Site
     {
         return Site::factory()->create([

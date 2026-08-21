@@ -65,7 +65,12 @@
                     label="Перевірити всі адреси"
                     class="px-3 py-1.5"
                 />
-                @if ($canDeleteLastManualRun && ! $checksBusy)
+                @if ($isDeletingLastManualRun)
+                    <p class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-200">
+                        @include('partials.icons.spinner')
+                        Видаляється останній прохід…
+                    </p>
+                @elseif ($canDeleteLastManualRun && ! $checksBusy)
                     <button
                         type="button"
                         wire:click="deleteLastManualCheckRun"
