@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
+use App\Exceptions\CheckRunCancelledException;
 use App\Models\Address;
 use App\Models\Snapshot;
 
@@ -10,6 +13,7 @@ class SnapshotChecker
     public function __construct(
         private HttpFetcher $fetcher,
         private DiffService $diffService,
+        private CheckingGuard $guard,
     ) {}
 
     /**
@@ -17,6 +21,8 @@ class SnapshotChecker
      */
     public function check(Address $address, ?int $checkRunId = null): array
     {
+        $this->assertRunAllowsSnapshots($checkRunId);
+
         $previous = $address->snapshots()->orderByDesc('id')->first();
         $address->loadMissing('site');
         $site = $address->site;
@@ -28,6 +34,8 @@ class SnapshotChecker
             $site->checksPerMinute(),
             'site-'.$site->id,
         );
+
+        $this->assertRunAllowsSnapshots($checkRunId);
 
         $snapshot = Snapshot::query()->create([
             'address_id' => $address->id,
@@ -50,5 +58,14 @@ class SnapshotChecker
             'previous' => $previous,
             'diff' => $diff,
         ];
+    }
+
+    private function assertRunAllowsSnapshots(?int $checkRunId): void
+    {
+        if ($checkRunId === null || ! $this->guard->isRunCancelled($checkRunId)) {
+            return;
+        }
+
+        throw new CheckRunCancelledException($checkRunId);
     }
 }

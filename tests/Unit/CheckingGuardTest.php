@@ -6,6 +6,7 @@ namespace Tests\Unit;
 
 use App\Jobs\CheckAddressJob;
 use App\Models\Address;
+use App\Models\CheckRun;
 use App\Models\Site;
 use App\Services\CheckingGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -81,5 +82,61 @@ class CheckingGuardTest extends TestCase
 
         $this->assertFalse($guard->isBusy($busySite->id));
         $this->assertSame([], $guard->busySiteIds());
+    }
+
+    public function test_forget_pending_jobs_removes_only_jobs_for_that_check_run(): void
+    {
+        config(['queue.default' => 'database']);
+
+        $site = Site::factory()->create([
+            'name' => 'Busy',
+            'base_url' => 'https://busy.example.com',
+        ]);
+        $other = Site::factory()->create([
+            'name' => 'Other',
+            'base_url' => 'https://other.example.com',
+        ]);
+        $first = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/one',
+        ]);
+        $second = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/two',
+        ]);
+        $otherAddress = Address::query()->create([
+            'site_id' => $other->id,
+            'endpoint' => '/health',
+        ]);
+
+        $run = CheckRun::start($site, CheckRun::SOURCE_MANUAL, 2);
+        $keptRun = CheckRun::start($other, CheckRun::SOURCE_MANUAL, 1);
+        CheckAddressJob::dispatch($first, $run->id);
+        CheckAddressJob::dispatch($second, $run->id);
+        CheckAddressJob::dispatch($otherAddress, $keptRun->id);
+
+        $guard = app(CheckingGuard::class);
+        $deleted = $guard->forgetPendingJobsForRun((int) $site->id, (int) $run->id);
+
+        $this->assertSame(2, $deleted);
+        $this->assertFalse($guard->hasPendingCheckJobs($site->id));
+        $this->assertTrue($guard->hasPendingCheckJobs($other->id));
+    }
+
+    public function test_cancelled_run_flag_is_honored_and_missing_runs_are_cancelled(): void
+    {
+        $site = Site::factory()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $run = CheckRun::start($site, CheckRun::SOURCE_MANUAL, 1);
+        $guard = app(CheckingGuard::class);
+
+        $this->assertFalse($guard->isRunCancelled((int) $run->id));
+
+        $guard->cancelRun((int) $run->id);
+
+        $this->assertTrue($guard->isRunCancelled((int) $run->id));
+        $this->assertTrue($guard->isRunCancelled(999_999));
     }
 }
