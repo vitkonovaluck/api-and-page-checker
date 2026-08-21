@@ -65,24 +65,6 @@
                     label="Перевірити всі адреси"
                     class="px-3 py-1.5"
                 />
-                @if ($canDeleteLastManualRun && ! $checksBusy)
-                    <button
-                        type="button"
-                        wire:click="deleteLastManualCheckRun"
-                        wire:confirm="Видалити всі знімки останнього ручного проходу? Цю дію неможливо скасувати."
-                        wire:loading.attr="disabled"
-                        wire:target="deleteLastManualCheckRun"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-rose-400/20 px-3 py-1.5 text-sm font-medium text-rose-200 transition hover:bg-rose-400/10 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        <span wire:loading.remove wire:target="deleteLastManualCheckRun" class="inline-flex">
-                            @include('partials.icons.trash')
-                        </span>
-                        <span wire:loading wire:target="deleteLastManualCheckRun" class="inline-flex">
-                            @include('partials.icons.spinner')
-                        </span>
-                        Видалити останній прохід
-                    </button>
-                @endif
             </div>
         </div>
     </div>
@@ -167,13 +149,38 @@
     <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/80 shadow-xl shadow-cyan-950/20 backdrop-blur-sm">
         <div class="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-2">
             <h2 class="text-sm font-semibold text-white">Адреси</h2>
-            <button
-                type="button"
-                wire:click="$dispatch('open-create-address')"
-                class="inline-flex rounded-xl bg-cyan-400 px-3 py-1 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-300"
-            >
-                Додати адресу
-            </button>
+            <div class="flex flex-wrap items-center justify-end gap-1.5">
+                @if ($isDeletingLastManualRun)
+                    <p class="inline-flex items-center gap-1.5 px-3 py-1 text-sm font-medium text-amber-200">
+                        @include('partials.icons.spinner')
+                        Видаляється останній прохід…
+                    </p>
+                @elseif ($canDeleteLastManualRun && ! $checksBusy)
+                    <button
+                        type="button"
+                        wire:click="deleteLastManualCheckRun"
+                        wire:confirm="Видалити всі знімки останнього ручного проходу? Цю дію неможливо скасувати."
+                        wire:loading.attr="disabled"
+                        wire:target="deleteLastManualCheckRun"
+                        class="inline-flex items-center gap-1.5 rounded-xl border border-rose-400/20 px-3 py-1 text-sm font-medium text-rose-200 transition hover:bg-rose-400/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <span wire:loading.remove wire:target="deleteLastManualCheckRun" class="inline-flex">
+                            @include('partials.icons.trash')
+                        </span>
+                        <span wire:loading wire:target="deleteLastManualCheckRun" class="inline-flex">
+                            @include('partials.icons.spinner')
+                        </span>
+                        Видалити останній прохід
+                    </button>
+                @endif
+                <button
+                    type="button"
+                    wire:click="$dispatch('open-create-address')"
+                    class="inline-flex rounded-xl bg-cyan-400 px-3 py-1 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-300"
+                >
+                    Додати адресу
+                </button>
+            </div>
         </div>
 
         @if ($site->addresses->isEmpty())

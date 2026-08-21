@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\ColorScheme;
 use App\Filament\Resources\Users\Pages\EditUser;
 use App\Models\Plan;
 use App\Models\User;
@@ -45,11 +46,35 @@ class AdminPanelAccessTest extends TestCase
                 'name' => $member->name,
                 'email' => $member->email,
                 'role' => $member->role->value,
+                'color_scheme' => $member->color_scheme->value,
                 'plan_id' => $pro->id,
             ])
             ->call('save')
             ->assertHasNoFormErrors();
 
         $this->assertTrue($member->fresh()->plan->is($pro));
+    }
+
+    public function test_admin_can_change_a_users_color_scheme(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $member = User::factory()->create([
+            'color_scheme' => ColorScheme::DarkCyan,
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(EditUser::class, ['record' => $member->id])
+            ->fillForm([
+                'name' => $member->name,
+                'email' => $member->email,
+                'role' => $member->role->value,
+                'color_scheme' => ColorScheme::LightSky->value,
+                'plan_id' => $member->plan_id,
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame(ColorScheme::LightSky, $member->fresh()->color_scheme);
     }
 }

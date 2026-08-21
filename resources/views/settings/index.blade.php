@@ -9,6 +9,8 @@
     </div>
 
     <div class="grid gap-6 lg:grid-cols-2">
+        <livewire:settings.color-scheme-picker :key="'color-scheme-settings'" />
+
         <section class="rounded-2xl border border-white/10 bg-zinc-900/80 p-5 shadow-xl shadow-cyan-950/20 backdrop-blur-sm">
             <h2 class="mb-2 text-base font-semibold text-white">Експорт сайтів</h2>
             <p class="mb-4 text-sm text-zinc-400">

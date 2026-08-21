@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="uk" class="dark scroll-smooth">
+<html lang="uk" class="{{ $colorScheme->htmlClass() }}" data-theme="{{ $colorScheme->value }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">

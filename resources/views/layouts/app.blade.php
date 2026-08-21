@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="uk" class="dark scroll-smooth">
+<html lang="uk" class="{{ $colorScheme->htmlClass() }}" data-theme="{{ $colorScheme->value }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -24,7 +24,11 @@
                 <a href="{{ route('sites.index') }}" class="text-sm font-semibold tracking-tight text-white sm:text-base" wire:navigate>
                     {{ __('landing.brand') }}
                 </a>
-                <nav class="hidden flex-wrap items-center gap-4 text-sm md:flex" aria-label="{{ __('landing.brand') }}">
+                <div class="flex items-center gap-3">
+                    @auth
+                        <livewire:settings.color-scheme-picker :compact="true" :key="'color-scheme-header'" />
+                    @endauth
+                    <nav class="hidden flex-wrap items-center gap-4 text-sm md:flex" aria-label="{{ __('landing.brand') }}">
                     @auth
                         <a
                             href="{{ route('sites.index') }}"
@@ -78,6 +82,7 @@
                         </div>
                     </details>
                 @endauth
+                </div>
             </div>
         </header>
 

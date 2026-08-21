@@ -86,4 +86,15 @@ return [
     |
     */
     'agent_snapshot_body_max_kb' => (int) env('AGENT_SNAPSHOT_BODY_MAX_KB', 1024),
+    /*
+    |--------------------------------------------------------------------------
+    | Delete a check run's snapshots
+    |--------------------------------------------------------------------------
+    |
+    | Bodies are longText, so a full-site manual pass is deleted in chunks on
+    | the site queue (not inside the Livewire request) to avoid HTTP 504s.
+    |
+    */
+    'snapshot_delete_chunk' => (int) env('CHECKING_SNAPSHOT_DELETE_CHUNK', 50),
+    'delete_run_lock_seconds' => (int) env('CHECKING_DELETE_RUN_LOCK_SECONDS', 7200),
 ];
