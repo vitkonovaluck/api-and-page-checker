@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Exceptions\CheckRunCancelledException;
 use App\Models\Address;
 use App\Models\CheckRun;
 use App\Models\Site;
+use App\Services\CheckingGuard;
 use App\Services\SnapshotChecker;
 use DateTimeInterface;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 class CheckAddressJob implements ShouldQueue
@@ -69,8 +72,12 @@ class CheckAddressJob implements ShouldQueue
 
     public function handle(SnapshotChecker $checker): void
     {
-        $this->address->loadMissing('site');
-        $checker->check($this->address, $this->checkRunId);
+        try {
+            $this->address->loadMissing('site');
+            $checker->check($this->address, $this->checkRunId);
+        } catch (CheckRunCancelledException) {
+            return;
+        }
 
         $delay = (int) config('checking.delay_seconds', 1);
         if ($delay > 0) {
@@ -87,7 +94,11 @@ class CheckAddressJob implements ShouldQueue
 
     private function maybeQueueChainedCheck(): void
     {
-        if ($this->checkRunId === null || ! RestartSiteCheckJob::releaseSlot($this->checkRunId)) {
+        if ($this->checkRunId === null || $this->runWasCancelled()) {
+            return;
+        }
+
+        if (! RestartSiteCheckJob::releaseSlot($this->checkRunId)) {
             return;
         }
 
@@ -97,5 +108,11 @@ class CheckAddressJob implements ShouldQueue
         }
 
         RestartSiteCheckJob::dispatchDelayed($this->siteId);
+    }
+
+    private function runWasCancelled(): bool
+    {
+        return $this->checkRunId !== null
+            && Cache::has(CheckingGuard::cancelledRunKey($this->checkRunId));
     }
 }

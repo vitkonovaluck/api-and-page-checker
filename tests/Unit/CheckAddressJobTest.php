@@ -9,6 +9,7 @@ use App\Jobs\RestartSiteCheckJob;
 use App\Models\Address;
 use App\Models\CheckRun;
 use App\Models\Site;
+use App\Services\CheckingGuard;
 use App\Services\SnapshotChecker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Queue\Middleware\RateLimited;
@@ -49,6 +50,34 @@ class CheckAddressJobTest extends TestCase
 
         $this->assertSame(1, $address->snapshots()->count());
         $this->assertNotNull($address->fresh()->last_checked_at);
+    }
+
+    public function test_job_skips_http_and_snapshot_when_the_run_was_cancelled(): void
+    {
+        config(['checking.delay_seconds' => 0]);
+
+        $site = Site::factory()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/health',
+        ]);
+        $run = CheckRun::start($site, CheckRun::SOURCE_MANUAL, 1);
+
+        app(CheckingGuard::class)->cancelRun((int) $run->id);
+
+        Http::fake([
+            'https://api.example.com/health' => Http::response(['ok' => true], 200),
+        ]);
+
+        (new CheckAddressJob($address, $run->id))->handle(app(SnapshotChecker::class));
+
+        Http::assertNothingSent();
+        $this->assertSame(0, $address->snapshots()->count());
+        $this->assertNull($address->fresh()?->last_checked_at);
+        $this->assertSame(1, $run->fresh()?->remaining_jobs);
     }
 
     public function test_job_is_assigned_to_the_site_queue(): void
