@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Jobs\CheckAddressJob;
+use App\Jobs\DeleteLatestManualCheckRunJob;
 use App\Livewire\Sites\Show;
 use App\Models\Address;
 use App\Models\CheckRun;
@@ -12,6 +13,7 @@ use App\Models\Site;
 use App\Models\Snapshot;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -43,12 +45,33 @@ class DeleteLatestManualCheckRunTest extends TestCase
             ->assertSee('Видалити останній прохід')
             ->call('deleteLastManualCheckRun')
             ->assertRedirect("/sites/{$site->id}")
-            ->assertSessionHas('success', 'Видалено знімків останнього проходу: 2.');
+            ->assertSessionHas('success', 'Видалення останнього проходу запущено.');
 
         $this->assertModelMissing($manual);
         $this->assertModelExists($previous);
         $this->assertModelExists($keptFirst);
         $this->assertModelExists($keptSecond);
+    }
+
+    public function test_site_show_queues_deletion_instead_of_running_it_in_the_request(): void
+    {
+        Queue::fake();
+
+        $site = $this->makeSite();
+        [$first, $second] = $this->makeAddresses($site);
+
+        $manual = CheckRun::start($site, CheckRun::SOURCE_MANUAL);
+        $this->createSnapshot($first, $manual->id, '2026-08-21 11:00:00');
+        $this->createSnapshot($second, $manual->id, '2026-08-21 11:00:01');
+
+        Livewire::test(Show::class, ['site' => $site])
+            ->call('deleteLastManualCheckRun')
+            ->assertRedirect("/sites/{$site->id}")
+            ->assertSessionHas('success', 'Видалення останнього проходу запущено.');
+
+        Queue::assertPushedOn(Site::checkQueueName((int) $site->id), DeleteLatestManualCheckRunJob::class);
+        $this->assertModelExists($manual);
+        $this->assertSame(2, $manual->snapshots()->count());
     }
 
     public function test_delete_button_is_hidden_when_latest_run_is_scheduled(): void

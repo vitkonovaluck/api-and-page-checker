@@ -59,15 +59,13 @@ class Show extends Component
             return;
         }
 
-        $deleted = $action->execute($this->site);
-
-        if ($deleted < 1) {
+        if (! $action->queue($this->site)) {
             $this->redirectWithFlash('error', 'Немає завершеного ручного проходу для видалення.');
 
             return;
         }
 
-        $this->redirectWithFlash('success', "Видалено знімків останнього проходу: {$deleted}.");
+        $this->redirectWithFlash('success', 'Видалення останнього проходу запущено.');
     }
 
     public function refreshData(CheckingGuard $guard): void
@@ -96,7 +94,9 @@ class Show extends Component
             'scheduleStats' => $scheduleStats,
             'siteStats' => $siteStats,
             'metricEnum' => $metric,
-            'canDeleteLastManualRun' => $deleteLatestManualCheckRun->find($this->site) !== null,
+            'canDeleteLastManualRun' => $deleteLatestManualCheckRun->find($this->site) !== null
+                && ! $deleteLatestManualCheckRun->isDeleting($this->site),
+            'isDeletingLastManualRun' => $deleteLatestManualCheckRun->isDeleting($this->site),
         ])->title($this->site->name.' — API Snapshot Checker');
     }
 
