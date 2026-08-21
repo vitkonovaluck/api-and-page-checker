@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Users\Schemas;
 
+use App\Enums\ColorScheme;
 use App\Enums\SocialProvider;
 use App\Enums\UserRole;
 use App\Models\Plan;
@@ -45,6 +46,11 @@ final class UserForm
                             ->options(UserRole::options())
                             ->required()
                             ->default(UserRole::User->value),
+                        Select::make('color_scheme')
+                            ->label(__('admin.users.color_scheme'))
+                            ->options(ColorScheme::options())
+                            ->required()
+                            ->default(ColorScheme::default()->value),
                         Select::make('plan_id')
                             ->label(__('admin.users.plan'))
                             ->relationship('plan', 'name')

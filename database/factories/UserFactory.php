@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\ColorScheme;
 use App\Enums\UserRole;
 use App\Models\Plan;
 use App\Models\User;
@@ -31,6 +32,7 @@ class UserFactory extends Factory
             'remember_token' => Str::random(10),
             'plan_id' => Plan::factory(),
             'role' => UserRole::User,
+            'color_scheme' => ColorScheme::default(),
         ];
     }
 

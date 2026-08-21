@@ -125,7 +125,42 @@
             </p>
         @else
             @if ($diff['body']['type'] === 'json' && ! empty($diff['body']['changes']))
-                <p class="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-400">Поля JSON, що змінилися</p>
+                <div
+                    class="mb-2 flex flex-wrap items-center justify-between gap-2"
+                    x-data="{
+                        copied: false,
+                        payload: @js(json_encode($diff['body']['changes'], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: ''),
+                        async copyAll() {
+                            try {
+                                await navigator.clipboard.writeText(this.payload);
+                            } catch (e) {
+                                const input = document.createElement('textarea');
+                                input.value = this.payload;
+                                input.setAttribute('readonly', '');
+                                input.style.position = 'fixed';
+                                input.style.left = '-9999px';
+                                document.body.appendChild(input);
+                                input.select();
+                                document.execCommand('copy');
+                                document.body.removeChild(input);
+                            }
+                            this.copied = true;
+                            setTimeout(() => { this.copied = false }, 2000);
+                        }
+                    }"
+                >
+                    <p class="text-xs font-medium uppercase tracking-wide text-zinc-400">Поля JSON, що змінилися</p>
+                    <button
+                        type="button"
+                        @click="copyAll()"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-2.5 py-1 text-xs font-medium text-zinc-200 transition hover:border-white/30 hover:bg-white/5 hover:text-white"
+                        title="Копіювати всі зміни"
+                        :aria-label="copied ? 'Скопійовано' : 'Копіювати всі зміни'"
+                    >
+                        @include('partials.icons.copy')
+                        <span x-text="copied ? 'Скопійовано' : 'Копіювати всі зміни'">Копіювати всі зміни</span>
+                    </button>
+                </div>
                 <div class="mb-4 overflow-x-auto rounded-lg border border-white/10">
                     <table class="min-w-full divide-y divide-white/10 text-sm">
                         <thead class="bg-white/5 text-left text-xs uppercase text-zinc-500">
