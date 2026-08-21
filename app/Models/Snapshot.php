@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use App\Enums\ResponseTimeMetric;
@@ -10,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'address_id',
     'check_run_id',
+    'check_agent_id',
     'status_code',
     'headers',
     'body',
@@ -30,6 +33,7 @@ class Snapshot extends Model
             'status_code' => 'integer',
             'response_time_ms' => 'integer',
             'check_run_id' => 'integer',
+            'check_agent_id' => 'integer',
             'created_at' => 'datetime',
         ];
     }
@@ -42,6 +46,11 @@ class Snapshot extends Model
     public function checkRun(): BelongsTo
     {
         return $this->belongsTo(CheckRun::class);
+    }
+
+    public function checkAgent(): BelongsTo
+    {
+        return $this->belongsTo(CheckAgent::class);
     }
 
     public function previous(): ?self

@@ -5,13 +5,13 @@
         x-effect="$wire.show ? ($el.open || $el.showModal()) : ($el.open && $el.close())"
         @close="$wire.close()"
         @click="if ($event.target === $el) $wire.close()"
-        class="w-[calc(100%-2rem)] max-w-2xl rounded-xl border border-slate-200 bg-white p-0 shadow-xl backdrop:bg-slate-900/40"
+        class="w-[calc(100%-2rem)] max-w-2xl rounded-2xl border border-white/10 bg-zinc-900 p-0 text-zinc-100 shadow-2xl backdrop:bg-zinc-950/70"
     >
         <div class="flex max-h-[90vh] flex-col">
-            <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+            <div class="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
                 <div>
-                    <h2 class="text-base font-semibold text-slate-900">Адреси для перевірки</h2>
-                    <p class="mt-0.5 text-sm text-slate-500">
+                    <h2 class="text-base font-semibold text-white">Адреси для перевірки</h2>
+                    <p class="mt-0.5 text-sm text-zinc-400">
                         Усі ендпоїнти сайту «{{ $site->name }}»
                         @if ($show)
                             ({{ $addresses->count() }})
@@ -21,7 +21,7 @@
                 <button
                     type="button"
                     wire:click="close"
-                    class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                    class="rounded-lg p-2 text-zinc-400 transition hover:bg-white/5 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-400"
                     title="Закрити"
                     aria-label="Закрити"
                 >
@@ -33,11 +33,11 @@
 
             <div class="overflow-y-auto px-5 py-5">
                 @if (! $show)
-                    <p class="py-6 text-center text-sm text-slate-500">Немає даних.</p>
+                    <p class="py-6 text-center text-sm text-zinc-400">Немає даних.</p>
                 @elseif ($addresses->isEmpty())
-                    <p class="py-6 text-center text-sm text-slate-500">Адрес для перевірки ще немає.</p>
+                    <p class="py-6 text-center text-sm text-zinc-400">Адрес для перевірки ще немає.</p>
                 @else
-                    <ul class="space-y-1.5 font-mono text-sm text-slate-800">
+                    <ul class="space-y-1.5 font-mono text-sm text-zinc-100">
                         @foreach ($addresses as $address)
                             <li class="break-all" wire:key="address-list-{{ $address->id }}">
                                 {{ $address->http_method ?: 'GET' }} {{ $address->endpoint }}
@@ -47,11 +47,11 @@
                 @endif
             </div>
 
-            <div class="flex justify-end border-t border-slate-200 px-5 py-4">
+            <div class="flex justify-end border-t border-white/10 px-5 py-4">
                 <button
                     type="button"
                     wire:click="close"
-                    class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                    class="rounded-lg border border-white/15 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-white/30 hover:bg-white/5 hover:text-white"
                 >
                     Закрити
                 </button>

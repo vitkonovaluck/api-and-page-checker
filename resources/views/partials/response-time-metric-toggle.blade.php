@@ -1,4 +1,4 @@
-<div class="inline-flex rounded-lg border border-slate-300 p-0.5" role="group" aria-label="Метрика часу">
+<div class="inline-flex rounded-lg border border-white/15 p-0.5" role="group" aria-label="Метрика часу">
     @foreach (\App\Enums\ResponseTimeMetric::cases() as $option)
         <button
             type="button"
@@ -6,8 +6,8 @@
             wire:key="metric-{{ $option->value }}"
             class="rounded-md px-3 py-1.5 text-sm font-medium transition
                 {{ $metric === $option->value
-                    ? 'bg-slate-900 text-white'
-                    : 'text-slate-700 hover:bg-slate-100' }}"
+                    ? 'bg-cyan-400 text-zinc-950'
+                    : 'text-zinc-300 hover:bg-white/5' }}"
         >
             {{ $option->toggleLabel() }}
         </button>

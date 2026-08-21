@@ -129,14 +129,7 @@ class CheckStats
             ->whereIn('address_id', $addressIds);
 
         if ($scheduledOnly) {
-            $runBucketsQuery->where(function ($query) {
-                $query->whereNull('check_run_id')
-                    ->orWhereIn('check_run_id', function ($sub) {
-                        $sub->select('id')
-                            ->from('check_runs')
-                            ->where('source', CheckRun::SOURCE_SCHEDULE);
-                    });
-            });
+            $this->constrainToPeriodicRuns($runBucketsQuery);
         }
 
         $runBuckets = $runBucketsQuery
@@ -164,8 +157,8 @@ class CheckStats
 
     /**
      * Snapshots with errors for a site. When $scheduledOnly is true, only
-     * schedule-enabled addresses and schedule (or legacy) runs are included —
-     * matching «Сер. помилок / запуск».
+     * schedule-enabled addresses and periodic (schedule/agent or legacy) runs
+     * are included — matching «Сер. помилок / запуск».
      *
      * @return Builder<Snapshot>
      */
@@ -190,14 +183,7 @@ class CheckStats
             ->orderByDesc('id');
 
         if ($scheduledOnly) {
-            $query->where(function ($inner) {
-                $inner->whereNull('check_run_id')
-                    ->orWhereIn('check_run_id', function ($sub) {
-                        $sub->select('id')
-                            ->from('check_runs')
-                            ->where('source', CheckRun::SOURCE_SCHEDULE);
-                    });
-            });
+            $this->constrainToPeriodicRuns($query);
         }
 
         return $query;
@@ -637,12 +623,21 @@ class CheckStats
             return $query;
         }
 
+        return $this->constrainToPeriodicRuns($query);
+    }
+
+    /**
+     * @param  Builder<Snapshot>  $query
+     * @return Builder<Snapshot>
+     */
+    private function constrainToPeriodicRuns(Builder $query): Builder
+    {
         return $query->where(function ($inner) {
             $inner->whereNull('check_run_id')
                 ->orWhereIn('check_run_id', function ($sub) {
                     $sub->select('id')
-                        ->from('check_runs')
-                        ->where('source', CheckRun::SOURCE_SCHEDULE);
+                        ->from((new CheckRun)->getTable())
+                        ->whereIn('source', CheckRun::periodicSources());
                 });
         });
     }

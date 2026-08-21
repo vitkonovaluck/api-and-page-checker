@@ -1,21 +1,21 @@
 <div wire:poll.3s="refreshData">
     <div class="mb-6">
-        <nav class="mb-2 text-sm text-slate-500">
-            <a href="{{ route('sites.index') }}" wire:navigate class="text-sky-700 hover:underline">Сайти</a>
+        <nav class="mb-2 text-sm text-zinc-400">
+            <a href="{{ route('sites.index') }}" wire:navigate class="text-cyan-300 hover:text-cyan-200 hover:underline">Сайти</a>
             <span class="mx-1">/</span>
-            <a href="{{ route('sites.show', $site) }}" wire:navigate class="text-sky-700 hover:underline">{{ $site->name }}</a>
+            <a href="{{ route('sites.show', $site) }}" wire:navigate class="text-cyan-300 hover:text-cyan-200 hover:underline">{{ $site->name }}</a>
             <span class="mx-1">/</span>
-            <span class="text-slate-700">{{ $address->name ?: 'Адреса' }}</span>
+            <span class="text-zinc-300">{{ $address->name ?: 'Адреса' }}</span>
         </nav>
         <div class="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h1 class="text-2xl font-semibold text-slate-900">{{ $address->name ?: 'Без назви' }}</h1>
-                <p class="mt-1 flex flex-wrap items-center gap-2 break-all font-mono text-sm text-slate-600">
-                    <span class="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700">{{ $address->http_method ?: 'GET' }}</span>
+                <h1 class="text-2xl font-semibold tracking-tight text-white">{{ $address->name ?: 'Без назви' }}</h1>
+                <p class="mt-1 flex flex-wrap items-center gap-2 break-all font-mono text-sm text-zinc-400">
+                    <span class="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-300">{{ $address->http_method ?: 'GET' }}</span>
                     <span>{{ $address->endpoint }}</span>
                 </p>
-                <p class="mt-1 break-all font-mono text-xs text-slate-400">{{ $address->fullUrl() }}</p>
-                <p class="mt-2 text-sm text-slate-500">
+                <p class="mt-1 break-all font-mono text-xs text-zinc-500">{{ $address->fullUrl() }}</p>
+                <p class="mt-2 text-sm text-zinc-400">
                     Остання перевірка:
                     {{ $address->last_checked_at?->format('d.m.Y H:i:s') ?? 'ще не перевірялася' }}
                 </p>
@@ -24,7 +24,7 @@
                 <button
                     type="button"
                     wire:click="$dispatch('open-address-settings')"
-                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                    class="inline-flex items-center gap-2 rounded-lg border border-white/15 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-white/30 hover:bg-white/5 hover:text-white"
                 >
                     @include('partials.icons.cog')
                     Налаштування
@@ -33,7 +33,7 @@
                 <button
                     type="button"
                     wire:click="$dispatch('open-response-time-chart')"
-                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                    class="inline-flex items-center gap-2 rounded-lg border border-white/15 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-white/30 hover:bg-white/5 hover:text-white"
                 >
                     Графік
                 </button>
@@ -61,65 +61,65 @@
             @include('partials.diff', ['diff' => $diff])
         </div>
 
-        <section class="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 class="mb-3 text-lg font-semibold text-slate-900">Останній знімок</h2>
+        <section class="mb-8 rounded-2xl border border-white/10 bg-zinc-900/80 p-5 shadow-xl shadow-cyan-950/20 backdrop-blur-sm">
+            <h2 class="mb-3 text-lg font-semibold text-white">Останній знімок</h2>
             <dl class="grid gap-3 text-sm sm:grid-cols-3">
                 <div>
-                    <dt class="text-xs uppercase tracking-wide text-slate-500">Дата</dt>
+                    <dt class="text-xs uppercase tracking-wide text-zinc-400">Дата</dt>
                     <dd class="mt-1 font-medium">{{ $latest->created_at->format('d.m.Y H:i:s') }}</dd>
                 </div>
                 <div>
-                    <dt class="text-xs uppercase tracking-wide text-slate-500">Статус</dt>
+                    <dt class="text-xs uppercase tracking-wide text-zinc-400">Статус</dt>
                     <dd class="mt-1 font-medium">{{ $latest->status_code ?? '—' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-xs uppercase tracking-wide text-slate-500">{{ $metricEnum->snapshotTimeLabel() }}</dt>
+                    <dt class="text-xs uppercase tracking-wide text-zinc-400">{{ $metricEnum->snapshotTimeLabel() }}</dt>
                     <dd class="mt-1 font-medium">{{ $latest->formattedTimeMs($metricEnum) }}</dd>
                 </div>
             </dl>
             @include('partials.timing', ['timing' => $latest->timing])
             @if ($latest->error_message)
-                <p class="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">{{ $latest->error_message }}</p>
+                <p class="mt-4 rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-sm text-rose-200">{{ $latest->error_message }}</p>
             @endif
             <div class="mt-4">
-                <h3 class="mb-2 text-sm font-semibold text-slate-800">Body</h3>
-                <pre class="max-h-80 overflow-auto rounded-lg border border-slate-200 bg-slate-950 p-4 text-xs text-slate-100"><code>{{ $latest->body }}</code></pre>
+                <h3 class="mb-2 text-sm font-semibold text-zinc-100">Body</h3>
+                <pre class="max-h-80 overflow-auto rounded-lg border border-white/10 bg-zinc-950 p-4 text-xs text-zinc-100"><code>{{ $latest->body }}</code></pre>
             </div>
             <div class="mt-4">
-                <a href="{{ route('addresses.snapshots.show', [$site, $address, $latest]) }}" wire:navigate class="text-sm text-sky-700 hover:underline">
+                <a href="{{ route('addresses.snapshots.show', [$site, $address, $latest]) }}" wire:navigate class="text-sm text-cyan-300 hover:text-cyan-200 hover:underline">
                     Відкрити деталі знімка →
                 </a>
             </div>
         </section>
     @endif
 
-    <section class="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div class="border-b border-slate-200 px-5 py-4">
-            <h2 class="text-base font-semibold text-slate-900">Історія знімків</h2>
+    <section class="rounded-2xl border border-white/10 bg-zinc-900/80 shadow-xl shadow-cyan-950/20 backdrop-blur-sm">
+        <div class="border-b border-white/10 px-5 py-4">
+            <h2 class="text-base font-semibold text-white">Історія знімків</h2>
             @if (($stats['checks_count'] ?? 0) > 0)
                 <dl class="mt-3 grid gap-3 sm:grid-cols-3">
-                    <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                        <dt class="text-xs uppercase tracking-wide text-slate-500">{{ $metricEnum->historyAverageLabel() }}</dt>
-                        <dd class="mt-0.5 text-sm font-semibold text-slate-900">{{ $stats['avg_response_time_ms'] !== null ? $stats['avg_response_time_ms'].' ms' : '—' }}</dd>
+                    <div class="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                        <dt class="text-xs uppercase tracking-wide text-zinc-400">{{ $metricEnum->historyAverageLabel() }}</dt>
+                        <dd class="mt-0.5 text-sm font-semibold text-white">{{ $stats['avg_response_time_ms'] !== null ? $stats['avg_response_time_ms'].' ms' : '—' }}</dd>
                     </div>
-                    <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                        <dt class="text-xs uppercase tracking-wide text-slate-500">Середня к-сть помилок</dt>
-                        <dd class="mt-0.5 text-sm font-semibold text-slate-900">{{ $stats['avg_errors'] }}</dd>
+                    <div class="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                        <dt class="text-xs uppercase tracking-wide text-zinc-400">Середня к-сть помилок</dt>
+                        <dd class="mt-0.5 text-sm font-semibold text-white">{{ $stats['avg_errors'] }}</dd>
                     </div>
-                    <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                        <dt class="text-xs uppercase tracking-wide text-slate-500">Помилок / перевірок</dt>
-                        <dd class="mt-0.5 text-sm font-semibold text-slate-900">{{ $stats['error_count'] }} / {{ $stats['checks_count'] }}</dd>
+                    <div class="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                        <dt class="text-xs uppercase tracking-wide text-zinc-400">Помилок / перевірок</dt>
+                        <dd class="mt-0.5 text-sm font-semibold text-white">{{ $stats['error_count'] }} / {{ $stats['checks_count'] }}</dd>
                     </div>
                 </dl>
             @endif
         </div>
 
         @if ($snapshots->isEmpty())
-            <p class="px-5 py-8 text-sm text-slate-500">Знімків ще немає. Натисніть «Зробити знімок».</p>
+            <p class="px-5 py-8 text-sm text-zinc-400">Знімків ще немає. Натисніть «Зробити знімок».</p>
         @else
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                <table class="min-w-full divide-y divide-white/10 text-sm">
+                    <thead class="bg-white/5 text-left text-xs uppercase tracking-wide text-zinc-500">
                         <tr>
                             <th class="px-5 py-3">#</th>
                             <th class="px-5 py-3">Дата</th>
@@ -129,18 +129,18 @@
                             <th class="px-5 py-3 text-right">Дії</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100">
+                    <tbody class="divide-y divide-white/5">
                         @foreach ($snapshots as $snapshot)
-                            <tr class="hover:bg-slate-50/80" wire:key="snapshot-{{ $snapshot->id }}">
-                                <td class="px-5 py-3 font-mono text-xs text-slate-500">{{ $snapshot->id }}</td>
+                            <tr class="hover:bg-white/5" wire:key="snapshot-{{ $snapshot->id }}">
+                                <td class="px-5 py-3 font-mono text-xs text-zinc-400">{{ $snapshot->id }}</td>
                                 <td class="px-5 py-3">{{ $snapshot->created_at->format('d.m.Y H:i:s') }}</td>
                                 <td class="px-5 py-3">{{ $snapshot->status_code ?? '—' }}</td>
                                 <td class="px-5 py-3">{{ $snapshot->formattedTimeMs($metricEnum) }}</td>
                                 <td class="px-5 py-3">
                                     @if ($snapshot->error_message)
-                                        <span class="text-red-700">помилка</span>
+                                        <span class="text-rose-300">помилка</span>
                                     @else
-                                        <span class="text-emerald-700">OK</span>
+                                        <span class="text-emerald-300">OK</span>
                                     @endif
                                 </td>
                                 <td class="px-5 py-3">
@@ -150,7 +150,7 @@
                                             wire:navigate
                                             title="Деталі"
                                             aria-label="Деталі"
-                                            class="inline-flex items-center justify-center rounded-lg border border-slate-300 p-2 text-slate-700 hover:bg-slate-100"
+                                            class="inline-flex items-center justify-center rounded-lg border border-white/15 p-2 text-zinc-300 transition hover:border-white/30 hover:bg-white/5 hover:text-white"
                                         >
                                             @include('partials.icons.eye')
                                         </a>
@@ -160,7 +160,7 @@
                                             wire:confirm="Видалити цей знімок?"
                                             title="Видалити"
                                             aria-label="Видалити"
-                                            class="inline-flex items-center justify-center rounded-lg border border-red-200 p-2 text-red-700 hover:bg-red-50"
+                                            class="inline-flex items-center justify-center rounded-lg border border-rose-400/20 p-2 text-rose-300 transition hover:bg-rose-400/10"
                                         >
                                             @include('partials.icons.trash')
                                         </button>
@@ -173,7 +173,7 @@
             </div>
 
             @if ($snapshots->hasPages())
-                <div class="border-t border-slate-200 px-5 py-4">
+                <div class="border-t border-white/10 px-5 py-4">
                     {{ $snapshots->links() }}
                 </div>
             @endif

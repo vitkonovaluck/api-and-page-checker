@@ -5,22 +5,22 @@
         x-effect="$wire.show ? ($el.open || $el.showModal()) : ($el.open && $el.close())"
         @close="$wire.close()"
         @click="if ($event.target === $el) $wire.close()"
-        class="w-[calc(100%-2rem)] max-w-4xl rounded-xl border border-slate-200 bg-white p-0 shadow-xl backdrop:bg-slate-900/40"
+        class="w-[calc(100%-2rem)] max-w-4xl rounded-2xl border border-white/10 bg-zinc-900 p-0 text-zinc-100 shadow-2xl backdrop:bg-zinc-950/70"
     >
         <div class="flex max-h-[90vh] flex-col">
-            <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+            <div class="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
                 <div>
-                    <h2 class="text-base font-semibold text-slate-900">
+                    <h2 class="text-base font-semibold text-white">
                         {{ $this->chartHeading() }}
                     </h2>
-                    <p class="mt-0.5 text-sm text-slate-500">
+                    <p class="mt-0.5 text-sm text-zinc-400">
                         {{ $this->chartDescription() }}
                     </p>
                 </div>
                 <button
                     type="button"
                     wire:click="close"
-                    class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                    class="rounded-lg p-2 text-zinc-400 transition hover:bg-white/5 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-400"
                     title="Закрити"
                     aria-label="Закрити"
                 >
@@ -34,24 +34,24 @@
                 @if (($this->chart['avg_response_time_ms'] ?? null) !== null || ($this->chart['avg_ttfb_ms'] ?? null) !== null)
                     <div class="flex flex-wrap gap-3">
                         @if (($this->chart['avg_response_time_ms'] ?? null) !== null)
-                            <div class="inline-block rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-                                <div class="text-xs uppercase tracking-wide text-slate-500">{{ $this->totalAverageLabel() }}</div>
-                                <div class="font-semibold text-slate-900">{{ $this->chart['avg_response_time_ms'] }} ms</div>
-                                <div class="text-xs text-slate-500">{{ $this->chart['checks_count'] }} перевірок · {{ $this->chart['period_label'] }}</div>
+                            <div class="inline-block rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm">
+                                <div class="text-xs uppercase tracking-wide text-zinc-400">{{ $this->totalAverageLabel() }}</div>
+                                <div class="font-semibold text-white">{{ $this->chart['avg_response_time_ms'] }} ms</div>
+                                <div class="text-xs text-zinc-400">{{ $this->chart['checks_count'] }} перевірок · {{ $this->chart['period_label'] }}</div>
                             </div>
                         @endif
                         @if (($this->chart['avg_ttfb_ms'] ?? null) !== null)
-                            <div class="inline-block rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-                                <div class="text-xs uppercase tracking-wide text-slate-500">{{ $this->ttfbAverageLabel() }}</div>
-                                <div class="font-semibold text-slate-900">{{ $this->chart['avg_ttfb_ms'] }} ms</div>
-                                <div class="text-xs text-slate-500">{{ $this->chart['checks_count'] }} перевірок · {{ $this->chart['period_label'] }}</div>
+                            <div class="inline-block rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm">
+                                <div class="text-xs uppercase tracking-wide text-zinc-400">{{ $this->ttfbAverageLabel() }}</div>
+                                <div class="font-semibold text-white">{{ $this->chart['avg_ttfb_ms'] }} ms</div>
+                                <div class="text-xs text-zinc-400">{{ $this->chart['checks_count'] }} перевірок · {{ $this->chart['period_label'] }}</div>
                             </div>
                         @endif
                     </div>
                 @endif
 
                 <div>
-                    <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Період вибірки</p>
+                    <p class="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-400">Період вибірки</p>
                     <div class="flex flex-wrap gap-1.5">
                         @foreach ($this->chart['periods'] as $key => $periodMeta)
                             <button
@@ -59,8 +59,8 @@
                                 wire:click="setPeriod('{{ $key }}')"
                                 class="rounded-lg px-3 py-1.5 text-sm font-medium transition
                                     {{ $period === $key
-                                        ? 'bg-slate-900 text-white'
-                                        : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-100' }}"
+                                        ? 'bg-cyan-400 text-zinc-950'
+                                        : 'border border-white/15 bg-zinc-950 text-zinc-200 hover:bg-white/5' }}"
                             >
                                 {{ $periodMeta['label'] }}
                             </button>
@@ -69,7 +69,7 @@
                 </div>
 
                 @if (empty($this->chart['has_data']))
-                    <p class="py-8 text-center text-sm text-slate-500">
+                    <p class="py-8 text-center text-sm text-zinc-400">
                         Немає перевірок за період «{{ $this->chart['period_label'] ?? $period }}».
                     </p>
                 @else
@@ -89,11 +89,11 @@
                 @endif
             </div>
 
-            <div class="flex justify-end border-t border-slate-200 px-5 py-4">
+            <div class="flex justify-end border-t border-white/10 px-5 py-4">
                 <button
                     type="button"
                     wire:click="close"
-                    class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                    class="rounded-lg border border-white/15 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-white/30 hover:bg-white/5 hover:text-white"
                 >
                     Закрити
                 </button>

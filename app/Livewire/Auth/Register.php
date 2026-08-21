@@ -57,7 +57,7 @@ class Register extends Component
         Auth::login($user);
         session()->regenerate();
 
-        $this->redirect(route('sites.index'), navigate: true);
+        $this->redirect(route('sites.index'));
     }
 
     public function render(): View

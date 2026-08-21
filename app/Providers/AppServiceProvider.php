@@ -1,9 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Providers;
 
 use App\Jobs\CheckAddressJob;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -41,6 +44,16 @@ class AppServiceProvider extends ServiceProvider
             }
 
             return Limit::perMinute($perMinute)->by('site-'.$job->address->site_id);
+        });
+
+        RateLimiter::for('agent-login', function (Request $request) {
+            return Limit::perMinute(5)->by($request->ip() ?? 'agent-login');
+        });
+
+        RateLimiter::for('agent-api', function (Request $request) {
+            $userId = $request->user()?->getAuthIdentifier();
+
+            return Limit::perMinute(60)->by('agent-api:'.($userId ?? $request->ip() ?? 'guest'));
         });
     }
 }
