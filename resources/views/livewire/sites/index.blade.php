@@ -73,6 +73,9 @@
                                             :disabled="$site->addresses_count === 0"
                                             title="Перевірити сайт"
                                         />
+                                        @if (in_array($site->id, $stoppableSiteIds, true))
+                                            <x-stop-check-button :click="'stopManualCheckRun('.$site->id.')'" icon-only />
+                                        @endif
                                         <a
                                             href="{{ route('sites.show', $site) }}"
                                             wire:navigate

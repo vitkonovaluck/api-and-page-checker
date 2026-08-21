@@ -65,6 +65,9 @@
                     label="Перевірити всі адреси"
                     class="px-3 py-1.5"
                 />
+                @if ($canStopManualCheck)
+                    <x-stop-check-button />
+                @endif
             </div>
         </div>
     </div>
@@ -148,12 +151,20 @@
 
     <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/80 shadow-xl shadow-cyan-950/20 backdrop-blur-sm">
         <div class="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-2">
-            <h2 class="text-sm font-semibold text-white">Адреси</h2>
+            <div class="flex items-center gap-2">
+                <h2 class="text-sm font-semibold text-white">Адреси</h2>
+                @if ($currentPassBodyChangeCount > 0)
+                    <span
+                        class="rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-0.5 text-xs font-semibold text-amber-100"
+                        title="Зміни body в поточному проході перевірки"
+                    >зміни: {{ $currentPassBodyChangeCount }}</span>
+                @endif
+            </div>
             <div class="flex flex-wrap items-center justify-end gap-1.5">
                 @if ($isDeletingLastManualRun)
                     <p class="inline-flex items-center gap-1.5 px-3 py-1 text-sm font-medium text-amber-200">
                         @include('partials.icons.spinner')
-                        Видаляється останній прохід…
+                        Видаляються дані проходу…
                     </p>
                 @elseif ($canDeleteLastManualRun && ! $checksBusy)
                     <button
@@ -198,7 +209,17 @@
                             <th class="w-40 px-3 py-2">Остання перевірка</th>
                             <th class="w-24 px-3 py-2">Статус</th>
                             <th class="w-28 px-3 py-2">{{ $metricEnum->columnLabel() }}</th>
-                            <th class="w-24 px-3 py-2">Body</th>
+                            <th class="w-24 px-3 py-2">
+                                <span class="inline-flex items-center gap-1">
+                                    Body
+                                    @if ($currentPassBodyChangeCount > 0)
+                                        <span
+                                            class="rounded-full border border-amber-300/20 bg-amber-300/10 px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-amber-100"
+                                            title="Зміни body в поточному проході перевірки"
+                                        >{{ $currentPassBodyChangeCount }}</span>
+                                    @endif
+                                </span>
+                            </th>
                             <th class="w-24 px-3 py-2">{{ $metricEnum->averageLabel() }}</th>
                             <th class="w-28 px-3 py-2">Сер. помилок</th>
                             <th class="w-36 px-3 py-2 text-right">Дії</th>

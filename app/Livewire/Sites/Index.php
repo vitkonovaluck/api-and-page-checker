@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
+use App\Actions\StopManualCheckRunAction;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\CheckingGuard;
@@ -38,12 +39,28 @@ class Index extends Component
         $this->redirect(route('sites.index'), navigate: true);
     }
 
+    public function stopManualCheckRun(int $siteId, StopManualCheckRunAction $action): void
+    {
+        $site = $this->currentUser()->sites()->whereKey($siteId)->firstOrFail();
+        $this->authorize('update', $site);
+
+        if (! $action->queue($site)) {
+            session()->flash('error', 'Немає активної ручної перевірки для зупинки.');
+            $this->redirect(route('sites.index'), navigate: true);
+
+            return;
+        }
+
+        session()->flash('success', 'Перевірку зупинено. Дані цього проходу видаляються.');
+        $this->redirect(route('sites.index'), navigate: true);
+    }
+
     public function refreshData(CheckingGuard $guard): void
     {
         $this->syncBusyState($guard);
     }
 
-    public function render(CheckingGuard $guard, PlanQuota $quota): View
+    public function render(CheckingGuard $guard, PlanQuota $quota, StopManualCheckRunAction $stopManualCheck): View
     {
         $user = $this->currentUser();
         $sites = $user->sites()
@@ -60,6 +77,7 @@ class Index extends Component
             'canCreateSite' => $usage['can_create_site'],
             'sitesUsed' => $usage['sites_used'],
             'sitesMax' => $usage['sites_max'],
+            'stoppableSiteIds' => $stopManualCheck->stoppableSiteIds($sites->modelKeys()),
         ]);
     }
 

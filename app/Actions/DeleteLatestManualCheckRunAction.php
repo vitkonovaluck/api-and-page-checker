@@ -30,7 +30,19 @@ final class DeleteLatestManualCheckRunAction
     {
         $run = $this->find($site);
 
-        if ($run === null || $this->isDeleting($site)) {
+        if ($run === null) {
+            return false;
+        }
+
+        return $this->queueRun($site, $run, $this->addressIdsForRun($run));
+    }
+
+    /**
+     * @param  list<int>  $addressIds
+     */
+    public function queueRun(Site $site, CheckRun $run, array $addressIds): bool
+    {
+        if ($this->isDeleting($site)) {
             return false;
         }
 
@@ -39,7 +51,7 @@ final class DeleteLatestManualCheckRunAction
         DeleteLatestManualCheckRunJob::dispatch(
             (int) $site->id,
             (int) $run->id,
-            $this->addressIdsForRun($run),
+            $addressIds,
         );
 
         return true;

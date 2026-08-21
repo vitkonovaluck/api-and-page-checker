@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Actions\DeleteLatestManualCheckRunAction;
+use App\Actions\StopManualCheckRunAction;
 use App\Livewire\Concerns\InteractsWithResponseTimeMetric;
 use App\Models\Address;
 use App\Models\Site;
@@ -68,6 +69,20 @@ class Show extends Component
         $this->redirectWithFlash('success', 'Видалення останнього проходу запущено.');
     }
 
+    public function stopManualCheckRun(StopManualCheckRunAction $action, CheckingGuard $guard): void
+    {
+        $this->authorize('update', $this->site);
+        $this->syncBusyState($guard);
+
+        if (! $action->queue($this->site)) {
+            $this->redirectWithFlash('error', 'Немає активної ручної перевірки для зупинки.');
+
+            return;
+        }
+
+        $this->redirectWithFlash('success', 'Перевірку зупинено. Дані цього проходу видаляються.');
+    }
+
     public function refreshData(CheckingGuard $guard): void
     {
         $this->site->refresh();
@@ -78,6 +93,7 @@ class Show extends Component
         CheckStats $checkStats,
         CheckingGuard $guard,
         DeleteLatestManualCheckRunAction $deleteLatestManualCheckRun,
+        StopManualCheckRunAction $stopManualCheckRun,
     ): View {
         $this->syncBusyState($guard);
         $this->site->load(['addresses' => fn ($q) => $q->with(['latestSnapshot', 'previousSnapshot'])->orderBy('id')]);
@@ -94,9 +110,12 @@ class Show extends Component
             'scheduleStats' => $scheduleStats,
             'siteStats' => $siteStats,
             'metricEnum' => $metric,
+            'currentPassBodyChangeCount' => $this->currentPassBodyChangeCount(),
             'canDeleteLastManualRun' => $deleteLatestManualCheckRun->find($this->site) !== null
                 && ! $deleteLatestManualCheckRun->isDeleting($this->site),
             'isDeletingLastManualRun' => $deleteLatestManualCheckRun->isDeleting($this->site),
+            'canStopManualCheck' => $stopManualCheckRun->find($this->site) !== null
+                && ! $deleteLatestManualCheckRun->isDeleting($this->site),
         ])->title($this->site->name.' — API Snapshot Checker');
     }
 
@@ -115,5 +134,40 @@ class Show extends Component
     {
         session()->flash($type, $message);
         $this->redirect(route('sites.show', $this->site), navigate: true);
+    }
+
+    private function currentPassBodyChangeCount(): int
+    {
+        $latestRunId = $this->latestPassRunId();
+
+        return $this->site->addresses
+            ->filter(fn (Address $address): bool => $this->bodyChangedInPass($address, $latestRunId))
+            ->count();
+    }
+
+    private function latestPassRunId(): ?int
+    {
+        $runId = $this->site->addresses
+            ->map(fn (Address $address): ?int => $address->latestSnapshot?->check_run_id)
+            ->filter(fn (?int $id): bool => $id !== null)
+            ->max();
+
+        return is_int($runId) ? $runId : null;
+    }
+
+    private function bodyChangedInPass(Address $address, ?int $latestRunId): bool
+    {
+        $latest = $address->latestSnapshot;
+        $previous = $address->previousSnapshot;
+
+        if ($latest === null || $previous === null) {
+            return false;
+        }
+
+        if ($latestRunId !== null && $latest->check_run_id !== $latestRunId) {
+            return false;
+        }
+
+        return $latest->body_hash !== $previous->body_hash;
     }
 }
