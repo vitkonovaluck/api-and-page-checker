@@ -18,10 +18,18 @@ class AppThemeTest extends TestCase
 
         $this->get(route('sites.index'))
             ->assertOk()
+            ->assertSee('data-theme="dark-cyan"', false)
             ->assertSee('bg-zinc-950', false)
             ->assertSee('bg-cyan-400', false)
             ->assertSee('landing-grid', false)
             ->assertSee(__('landing.brand'));
+    }
+
+    public function test_guest_pages_use_the_default_color_scheme(): void
+    {
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSee('data-theme="dark-cyan"', false);
     }
 
     public function test_settings_page_uses_landing_dark_cards(): void

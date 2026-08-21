@@ -28,6 +28,7 @@ return [
         'password' => 'Password',
         'password_help' => 'Leave empty to keep the current password.',
         'role' => 'Role',
+        'color_scheme' => 'Color scheme',
         'plan' => 'Plan',
         'social_providers' => 'Linked social accounts',
         'none' => 'None',

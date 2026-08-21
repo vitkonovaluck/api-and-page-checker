@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\ColorScheme;
 use App\Enums\UserRole;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
@@ -17,7 +18,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password', 'plan_id', 'role'])]
+#[Fillable(['name', 'email', 'password', 'plan_id', 'role', 'color_scheme'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser
 {
@@ -29,6 +30,7 @@ class User extends Authenticatable implements FilamentUser
      */
     protected $attributes = [
         'role' => UserRole::User->value,
+        'color_scheme' => ColorScheme::DarkCyan->value,
     ];
 
     /**
@@ -40,6 +42,7 @@ class User extends Authenticatable implements FilamentUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'role' => UserRole::class,
+            'color_scheme' => ColorScheme::class,
         ];
     }
 

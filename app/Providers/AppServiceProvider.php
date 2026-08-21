@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Enums\ColorScheme;
 use App\Jobs\CheckAddressJob;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\View\View as ViewInstance;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -55,5 +60,20 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(60)->by('agent-api:'.($userId ?? $request->ip() ?? 'guest'));
         });
+
+        $this->shareColorScheme();
+    }
+
+    private function shareColorScheme(): void
+    {
+        View::composer(
+            ['layouts.app', 'layouts::app', 'layouts.landing', 'layouts::landing', 'layouts.guest', 'layouts::guest'],
+            function (ViewInstance $view): void {
+                $user = Auth::user();
+                $scheme = $user instanceof User ? $user->color_scheme : ColorScheme::default();
+
+                $view->with('colorScheme', $scheme);
+            },
+        );
     }
 }
