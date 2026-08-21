@@ -65,6 +65,24 @@
                     label="Перевірити всі адреси"
                     class="px-3 py-1.5"
                 />
+                @if ($canDeleteLastManualRun && ! $checksBusy)
+                    <button
+                        type="button"
+                        wire:click="deleteLastManualCheckRun"
+                        wire:confirm="Видалити всі знімки останнього ручного проходу? Цю дію неможливо скасувати."
+                        wire:loading.attr="disabled"
+                        wire:target="deleteLastManualCheckRun"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-rose-400/20 px-3 py-1.5 text-sm font-medium text-rose-200 transition hover:bg-rose-400/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <span wire:loading.remove wire:target="deleteLastManualCheckRun" class="inline-flex">
+                            @include('partials.icons.trash')
+                        </span>
+                        <span wire:loading wire:target="deleteLastManualCheckRun" class="inline-flex">
+                            @include('partials.icons.spinner')
+                        </span>
+                        Видалити останній прохід
+                    </button>
+                @endif
             </div>
         </div>
     </div>

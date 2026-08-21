@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
+use App\Actions\DeleteLatestManualCheckRunAction;
 use App\Livewire\Concerns\InteractsWithResponseTimeMetric;
 use App\Models\Address;
 use App\Models\Site;
@@ -47,14 +48,39 @@ class Show extends Component
         $this->redirect(route('sites.show', $this->site), navigate: true);
     }
 
+    public function deleteLastManualCheckRun(DeleteLatestManualCheckRunAction $action, CheckingGuard $guard): void
+    {
+        $this->authorize('update', $this->site);
+        $this->syncBusyState($guard);
+
+        if ($this->checksBusy) {
+            $this->redirectWithFlash('error', 'Зараз уже виконується перевірка. Зачекайте завершення.');
+
+            return;
+        }
+
+        $deleted = $action->execute($this->site);
+
+        if ($deleted < 1) {
+            $this->redirectWithFlash('error', 'Немає завершеного ручного проходу для видалення.');
+
+            return;
+        }
+
+        $this->redirectWithFlash('success', "Видалено знімків останнього проходу: {$deleted}.");
+    }
+
     public function refreshData(CheckingGuard $guard): void
     {
         $this->site->refresh();
         $this->syncBusyState($guard);
     }
 
-    public function render(CheckStats $checkStats, CheckingGuard $guard): View
-    {
+    public function render(
+        CheckStats $checkStats,
+        CheckingGuard $guard,
+        DeleteLatestManualCheckRunAction $deleteLatestManualCheckRun,
+    ): View {
         $this->syncBusyState($guard);
         $this->site->load(['addresses' => fn ($q) => $q->with(['latestSnapshot', 'previousSnapshot'])->orderBy('id')]);
 
@@ -70,6 +96,7 @@ class Show extends Component
             'scheduleStats' => $scheduleStats,
             'siteStats' => $siteStats,
             'metricEnum' => $metric,
+            'canDeleteLastManualRun' => $deleteLatestManualCheckRun->find($this->site) !== null,
         ])->title($this->site->name.' — API Snapshot Checker');
     }
 
@@ -82,5 +109,11 @@ class Show extends Component
     {
         $this->busySiteIds = $guard->busySiteIds();
         $this->checksBusy = in_array($this->site->id, $this->busySiteIds, true);
+    }
+
+    private function redirectWithFlash(string $type, string $message): void
+    {
+        session()->flash($type, $message);
+        $this->redirect(route('sites.show', $this->site), navigate: true);
     }
 }

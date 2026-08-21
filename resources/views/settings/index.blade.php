@@ -5,7 +5,7 @@
 @section('content')
     <div class="mb-8">
         <h1 class="text-2xl font-semibold tracking-tight text-white">Налаштування</h1>
-        <p class="mt-1 text-sm text-zinc-400">Перенесення сайтів між серверами, бекап бази та службова інформація.</p>
+        <p class="mt-1 text-sm text-zinc-400">Перенесення сайтів між серверами, агенти перевірок, бекап бази та службова інформація.</p>
     </div>
 
     <div class="grid gap-6 lg:grid-cols-2">
@@ -53,6 +53,8 @@
                 </button>
             </form>
         </section>
+
+        <livewire:settings.agent-tokens />
 
         @if ($isAdmin)
         <section class="rounded-2xl border border-white/10 bg-zinc-900/80 p-5 shadow-xl shadow-cyan-950/20 backdrop-blur-sm">
