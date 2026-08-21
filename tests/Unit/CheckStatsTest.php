@@ -454,6 +454,32 @@ class CheckStatsTest extends TestCase
         $this->assertSame(0.0, $stats['avg_errors_per_run']);
     }
 
+    public function test_agent_run_is_included_in_schedule_run_count(): void
+    {
+        $site = Site::factory()->create([
+            'name' => 'Agent mixed',
+            'base_url' => 'https://api.example.com',
+            'schedule_enabled' => true,
+            'schedule_interval' => '15m',
+        ]);
+        $address = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/data',
+            'schedule_enabled' => true,
+        ]);
+
+        $scheduleRun = CheckRun::start($site, CheckRun::SOURCE_SCHEDULE);
+        $agentRun = CheckRun::start($site, CheckRun::SOURCE_AGENT);
+
+        $this->createSnapshot($address, 100, null, '2026-08-01 10:00:00', $scheduleRun->id);
+        $this->createSnapshot($address, 250, 'agent fail', '2026-08-01 10:10:00', $agentRun->id);
+
+        $stats = app(CheckStats::class)->forSite($site, scheduledOnly: true);
+        $this->assertSame(2, $stats['checks_count']);
+        $this->assertSame(2, $stats['runs_count']);
+        $this->assertSame(0.5, $stats['avg_errors_per_run']);
+    }
+
     private function createSnapshot(
         Address $address,
         int $responseTimeMs,

@@ -77,4 +77,13 @@ return [
         'version' => 1,
         'max_upload_kb' => (int) env('SITE_TRANSFER_MAX_UPLOAD_KB', 10240),
     ],
+    /*
+    |--------------------------------------------------------------------------
+    | Agent snapshot body size
+    |--------------------------------------------------------------------------
+    |
+    | Maximum request body the agent API will accept when ingesting a snapshot.
+    |
+    */
+    'agent_snapshot_body_max_kb' => (int) env('AGENT_SNAPSHOT_BODY_MAX_KB', 1024),
 ];
