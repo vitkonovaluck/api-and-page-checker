@@ -32,6 +32,34 @@ class AdminPanelAccessTest extends TestCase
             ->assertOk();
     }
 
+    public function test_admins_see_log_hub_under_settings(): void
+    {
+        $this->actingAs(User::factory()->admin()->create());
+
+        $this->get('/admincab')
+            ->assertOk()
+            ->assertSee(__('admin.navigation.settings'))
+            ->assertSee(__('filament-log-hub::log-hub.navigation.entries'));
+    }
+
+    public function test_admins_can_browse_log_hub_entries(): void
+    {
+        $this->actingAs(User::factory()->admin()->create());
+
+        $this->get('/admincab/log-hub')
+            ->assertOk()
+            ->assertSee(__('filament-log-hub::log-hub.navigation.entries'));
+    }
+
+    public function test_admins_can_open_log_hub_settings(): void
+    {
+        $this->actingAs(User::factory()->admin()->create());
+
+        $this->get('/admincab/log-hub-settings')
+            ->assertOk()
+            ->assertSee(__('filament-log-hub::log-hub.navigation.settings'));
+    }
+
     public function test_admin_can_change_a_users_plan(): void
     {
         $admin = User::factory()->admin()->create();

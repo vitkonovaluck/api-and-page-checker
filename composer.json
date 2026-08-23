@@ -12,7 +12,8 @@
         "laravel/sanctum": "^4.3",
         "laravel/socialite": "^5.30",
         "laravel/tinker": "^3.0",
-        "livewire/livewire": "^4.3"
+        "livewire/livewire": "^4.3",
+        "microcode/filament-log-hub": "^1.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
