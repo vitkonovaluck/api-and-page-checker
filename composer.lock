@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "fb03f506dcb4ec60d4042b4e425cf097",
+    "content-hash": "7ba265bad89db9cbbde4c1273d36e371",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -3591,6 +3591,77 @@
                 }
             ],
             "time": "2026-08-18T11:39:06+00:00"
+        },
+        {
+            "name": "microcode/filament-log-hub",
+            "version": "v1.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/vitkonovaluck/filament-log-hub.git",
+                "reference": "ca5a5813a508355f8b412e896c998392a32a4ea4"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/vitkonovaluck/filament-log-hub/zipball/ca5a5813a508355f8b412e896c998392a32a4ea4",
+                "reference": "ca5a5813a508355f8b412e896c998392a32a4ea4",
+                "shasum": ""
+            },
+            "require": {
+                "filament/filament": "^4.0|^5.0",
+                "illuminate/contracts": "^12.0|^13.0",
+                "illuminate/support": "^12.0|^13.0",
+                "livewire/livewire": "^3.0|^4.0",
+                "monolog/monolog": "^3.0",
+                "php": "^8.3",
+                "spatie/laravel-package-tools": "^1.16"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.18",
+                "orchestra/testbench": "^10.0|^11.0",
+                "phpunit/phpunit": "^11.0|^12.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Microcode\\FilamentLogHub\\FilamentLogHubServiceProvider"
+                    ]
+                },
+                "branch-alias": {
+                    "dev-main": "1.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Microcode\\FilamentLogHub\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Microcode",
+                    "email": "dev@example.com",
+                    "homepage": "https://github.com/vitkonovaluck"
+                }
+            ],
+            "description": "Filament plugin to collect Laravel logs, browse them in admin, and notify messengers",
+            "homepage": "https://github.com/vitkonovaluck/filament-log-hub",
+            "keywords": [
+                "Messenger",
+                "filament",
+                "laravel",
+                "logging",
+                "monolog",
+                "telegram"
+            ],
+            "support": {
+                "issues": "https://github.com/vitkonovaluck/filament-log-hub/issues",
+                "source": "https://github.com/vitkonovaluck/filament-log-hub"
+            },
+            "time": "2026-08-22T20:12:47+00:00"
         },
         {
             "name": "monolog/monolog",
