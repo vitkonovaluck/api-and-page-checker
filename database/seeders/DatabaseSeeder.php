@@ -16,14 +16,9 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
-        $freePlan = Plan::query()->create([
-            'name' => (string) config('plans.default_name'),
-            'slug' => (string) config('plans.default_slug'),
-            'max_sites' => (int) config('plans.default_max_sites'),
-            'max_addresses_per_site' => (int) config('plans.default_max_addresses_per_site'),
-            'is_default' => true,
-            'is_active' => true,
-        ]);
+        $this->call(PlanSeeder::class);
+
+        $freePlan = Plan::query()->where('is_default', true)->firstOrFail();
 
         User::query()->forceCreate([
             'name' => 'Admin',

@@ -25,6 +25,9 @@ class PlanFactory extends Factory
             'slug' => Str::slug($name).'-'.fake()->unique()->numerify('###'),
             'max_sites' => (int) config('plans.default_max_sites', 3),
             'max_addresses_per_site' => (int) config('plans.default_max_addresses_per_site', 20),
+            'max_addresses_total' => null,
+            'price_monthly' => 0,
+            'sort_order' => 0,
             'is_default' => false,
             'is_active' => true,
         ];
@@ -37,6 +40,15 @@ class PlanFactory extends Factory
             'slug' => (string) config('plans.default_slug', 'free'),
             'is_default' => true,
             'is_active' => true,
+        ]);
+    }
+
+    public function withTotalAddressLimit(int $maxAddresses): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'max_sites' => null,
+            'max_addresses_per_site' => null,
+            'max_addresses_total' => $maxAddresses,
         ]);
     }
 }
