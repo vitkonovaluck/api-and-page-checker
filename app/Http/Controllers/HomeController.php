@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\Plan;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -18,8 +19,13 @@ final class HomeController extends Controller
         };
 
         return view('landing', [
+            'plans' => Plan::query()
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get(),
+            'featuredSlug' => (string) config('plans.featured_slug'),
             'maxSites' => (int) config('plans.default_max_sites'),
-            'maxAddresses' => (int) config('plans.default_max_addresses_per_site'),
             'openAuth' => $openAuth,
         ]);
     }

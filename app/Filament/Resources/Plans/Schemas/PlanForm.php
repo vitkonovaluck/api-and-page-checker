@@ -30,13 +30,37 @@ final class PlanForm
                         TextInput::make('max_sites')
                             ->label(__('admin.plans.max_sites'))
                             ->numeric()
-                            ->required()
-                            ->minValue(0),
+                            ->minValue(0)
+                            ->rules(['nullable'])
+                            ->helperText(__('admin.plans.unlimited_help'))
+                            ->dehydrateStateUsing(fn (mixed $state): ?int => self::nullableLimit($state)),
                         TextInput::make('max_addresses_per_site')
                             ->label(__('admin.plans.max_addresses'))
                             ->numeric()
+                            ->minValue(0)
+                            ->rules(['nullable'])
+                            ->helperText(__('admin.plans.unlimited_help'))
+                            ->dehydrateStateUsing(fn (mixed $state): ?int => self::nullableLimit($state)),
+                        TextInput::make('max_addresses_total')
+                            ->label(__('admin.plans.max_addresses_total'))
+                            ->numeric()
+                            ->minValue(1)
+                            ->rules(['nullable'])
+                            ->helperText(__('admin.plans.max_addresses_total_help'))
+                            ->dehydrateStateUsing(fn (mixed $state): ?int => self::nullableLimit($state)),
+                        TextInput::make('price_monthly')
+                            ->label(__('admin.plans.price_monthly'))
+                            ->numeric()
+                            ->minValue(0)
+                            ->default(0)
                             ->required()
-                            ->minValue(0),
+                            ->helperText(__('admin.plans.price_monthly_help')),
+                        TextInput::make('sort_order')
+                            ->label(__('admin.plans.sort_order'))
+                            ->numeric()
+                            ->minValue(0)
+                            ->default(0)
+                            ->required(),
                         Toggle::make('is_default')
                             ->label(__('admin.plans.is_default'))
                             ->helperText(__('admin.plans.is_default_help')),
@@ -45,5 +69,14 @@ final class PlanForm
                             ->default(true),
                     ]),
             ]);
+    }
+
+    private static function nullableLimit(mixed $state): ?int
+    {
+        if ($state === null || $state === '') {
+            return null;
+        }
+
+        return (int) $state;
     }
 }

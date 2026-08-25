@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\Register;
+use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -45,5 +46,22 @@ class LandingPageTest extends TestCase
             ->assertSee(__('landing.meta_description', [
                 'sites' => config('plans.default_max_sites'),
             ]), false);
+    }
+
+    public function test_landing_page_lists_paid_plans_including_shared_address_pool(): void
+    {
+        $this->seed(PlanSeeder::class);
+
+        $agency = collect(config('plans.catalog'))->firstWhere('slug', 'agency');
+        $this->assertIsArray($agency);
+
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSee('Starter')
+            ->assertSee('Pro')
+            ->assertSee('Business')
+            ->assertSee('Agency')
+            ->assertSee(__('landing.pricing_sites_unlimited'))
+            ->assertSee(__('landing.pricing_addresses_total', ['count' => $agency['max_addresses_total']]));
     }
 }
