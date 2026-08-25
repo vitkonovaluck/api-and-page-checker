@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Livewire\Sites\SiteSettingsModal;
 use App\Models\Address;
 use App\Models\Site;
+use App\Models\SiteToken;
 use App\Models\Snapshot;
 use App\Services\SiteTransferService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -140,6 +141,47 @@ class SiteTransferTest extends TestCase
         $this->assertSame(['Authorization' => 'Bearer secret'], $address->request_headers);
         $this->assertNull($address->last_checked_at);
         $this->assertSame(0, $address->snapshots()->count());
+    }
+
+    public function test_copy_and_import_preserve_site_tokens_and_address_links(): void
+    {
+        $site = $this->makeSite();
+        $token = SiteToken::factory()->create([
+            'site_id' => $site->id,
+            'name' => 'Prod',
+            'value' => 'portable-secret',
+        ]);
+        $site->addresses()->first()?->update(['site_token_id' => $token->id]);
+
+        Livewire::test(SiteSettingsModal::class, ['site' => $site->fresh()])
+            ->call('copy')
+            ->assertRedirect();
+
+        $copy = Site::query()->where('name', 'Demo Shop (копія)')->first();
+        $this->assertNotNull($copy);
+        $copiedToken = $copy->tokens()->first();
+        $this->assertNotNull($copiedToken);
+        $this->assertSame('Prod', $copiedToken->name);
+        $this->assertSame('portable-secret', $copiedToken->value);
+        $this->assertNotSame($token->id, $copiedToken->id);
+        $this->assertSame($copiedToken->id, $copy->addresses()->first()?->site_token_id);
+
+        $payload = app(SiteTransferService::class)->exportSite($site->fresh(['tokens', 'addresses.siteToken']));
+        $this->assertSame('Prod', $payload['sites'][0]['tokens'][0]['name']);
+        $this->assertSame('portable-secret', $payload['sites'][0]['tokens'][0]['value']);
+        $this->assertSame('Prod', $payload['sites'][0]['addresses'][0]['token']);
+
+        $imported = app(SiteTransferService::class)->importJson(
+            app(SiteTransferService::class)->encode($payload),
+            $site->user,
+        )->first();
+
+        $this->assertNotNull($imported);
+        $importedToken = $imported->tokens()->first();
+        $this->assertNotNull($importedToken);
+        $this->assertSame('Prod', $importedToken->name);
+        $this->assertSame('portable-secret', $importedToken->value);
+        $this->assertSame($importedToken->id, $imported->addresses()->first()?->site_token_id);
     }
 
     public function test_import_does_not_replace_existing_sites(): void

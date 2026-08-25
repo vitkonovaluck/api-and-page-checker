@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Addresses;
 
 use App\Livewire\Concerns\HandlesHttpMethodAndBody;
@@ -10,7 +12,9 @@ use App\Models\User;
 use App\Services\PlanQuota;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -33,6 +37,8 @@ class CreateAddressModal extends Component
     /** @var list<array{name: string, value: string}> */
     public array $headers = [['name' => '', 'value' => '']];
 
+    public mixed $siteTokenId = null;
+
     public function mount(Site $site): void
     {
         $this->authorize('update', $site);
@@ -49,6 +55,7 @@ class CreateAddressModal extends Component
         $this->http_method = 'GET';
         $this->request_body = '';
         $this->headers = [['name' => '', 'value' => '']];
+        $this->siteTokenId = null;
         $this->show = true;
     }
 
@@ -77,15 +84,21 @@ class CreateAddressModal extends Component
             'headers' => ['nullable', 'array'],
             'headers.*.name' => ['nullable', 'string', 'max:255'],
             'headers.*.value' => ['nullable', 'string', 'max:2048'],
+            'siteTokenId' => [
+                'nullable',
+                'integer',
+                Rule::exists('site_tokens', 'id')->where('site_id', $this->site->id),
+            ],
         ], $this->methodAndBodyRules()));
 
         $headers = $this->normalizeRequestHeaders($validated['headers'] ?? []);
         $body = $this->resolvedRequestBody();
         $name = count($parsed) === 1 ? ($validated['name'] ?: null) : null;
+        $siteTokenId = $this->resolvedSiteTokenId($validated['siteTokenId'] ?? null);
 
         $quota->assertCanCreateAddresses($this->currentUser(), $this->site, count($parsed));
 
-        DB::transaction(function () use ($parsed, $name, $headers, $body, $validated): void {
+        DB::transaction(function () use ($parsed, $name, $headers, $body, $validated, $siteTokenId): void {
             foreach ($parsed as $endpoint) {
                 $this->site->addresses()->create([
                     'name' => $name,
@@ -94,6 +107,7 @@ class CreateAddressModal extends Component
                     'schedule_enabled' => $this->schedule_enabled,
                     'request_headers' => $headers,
                     'request_body' => $body,
+                    'site_token_id' => $siteTokenId,
                 ]);
             }
         });
@@ -150,8 +164,19 @@ class CreateAddressModal extends Component
         return $user;
     }
 
-    public function render()
+    public function render(): View
     {
+        $this->site->loadMissing(['tokens' => fn ($q) => $q->orderBy('id')]);
+
         return view('livewire.addresses.create-address-modal');
+    }
+
+    private function resolvedSiteTokenId(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return (int) $value;
     }
 }

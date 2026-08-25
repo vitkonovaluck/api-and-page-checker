@@ -85,6 +85,7 @@
                 </label>
             </div>
             @include('livewire.partials.request-body-editor')
+            @include('livewire.partials.site-token-select', ['fieldId' => 'create-address-token'])
             <div class="rounded-lg border border-white/10 bg-white/5 p-4">
                 @include('livewire.partials.headers-editor')
             </div>
