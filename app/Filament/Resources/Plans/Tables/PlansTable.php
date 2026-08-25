@@ -18,6 +18,7 @@ final class PlansTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->defaultSort('sort_order')
             ->columns([
                 TextColumn::make('id')
                     ->sortable(),
@@ -31,9 +32,21 @@ final class PlansTable
                     ->sortable(),
                 TextColumn::make('max_sites')
                     ->label(__('admin.plans.max_sites'))
+                    ->formatStateUsing(fn (mixed $state): string => self::limitLabel($state))
                     ->sortable(),
                 TextColumn::make('max_addresses_per_site')
                     ->label(__('admin.plans.max_addresses'))
+                    ->formatStateUsing(fn (mixed $state): string => self::limitLabel($state))
+                    ->sortable(),
+                TextColumn::make('max_addresses_total')
+                    ->label(__('admin.plans.max_addresses_total'))
+                    ->formatStateUsing(fn (mixed $state): string => self::limitLabel($state))
+                    ->sortable(),
+                TextColumn::make('price_monthly')
+                    ->label(__('admin.plans.price_monthly'))
+                    ->sortable(),
+                TextColumn::make('sort_order')
+                    ->label(__('admin.plans.sort_order'))
                     ->sortable(),
                 IconColumn::make('is_default')
                     ->label(__('admin.plans.is_default'))
@@ -62,5 +75,14 @@ final class PlansTable
                     DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    private static function limitLabel(mixed $state): string
+    {
+        if ($state === null || $state === '') {
+            return __('admin.plans.unlimited');
+        }
+
+        return (string) $state;
     }
 }

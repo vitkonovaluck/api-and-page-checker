@@ -11,24 +11,28 @@ use Illuminate\Validation\ValidationException;
 
 final class PlanQuota
 {
-    public function remainingSites(User $user): int
+    public function remainingSites(User $user): ?int
     {
-        return max(0, $this->plan($user)->max_sites - $user->sites()->count());
+        return $this->remaining($this->plan($user)->max_sites, $user->sites()->count());
     }
 
-    public function remainingAddresses(User $user, Site $site): int
+    public function remainingAddresses(User $user, Site $site): ?int
     {
-        return max(0, $this->plan($user)->max_addresses_per_site - $site->addresses()->count());
+        $plan = $this->plan($user);
+        $perSite = $this->remaining($plan->max_addresses_per_site, $site->addresses()->count());
+        $total = $this->remaining($plan->max_addresses_total, $this->addressCount($user));
+
+        return $this->minRemaining($perSite, $total);
     }
 
     public function canCreateSite(User $user): bool
     {
-        return $this->remainingSites($user) > 0;
+        return $this->hasRoom($this->remainingSites($user), 1);
     }
 
     public function canCreateAddresses(User $user, Site $site, int $adding = 1): bool
     {
-        return $adding > 0 && $this->remainingAddresses($user, $site) >= $adding;
+        return $adding > 0 && $this->hasRoom($this->remainingAddresses($user, $site), $adding);
     }
 
     public function assertCanCreateSite(User $user): void
@@ -38,7 +42,7 @@ final class PlanQuota
         }
 
         throw ValidationException::withMessages([
-            'name' => 'Досягнуто ліміт сайтів для вашого тарифу ('.$this->plan($user)->max_sites.').',
+            'name' => __('plans.quota.site_limit', ['max' => $this->plan($user)->max_sites]),
         ]);
     }
 
@@ -49,21 +53,14 @@ final class PlanQuota
         }
 
         throw ValidationException::withMessages([
-            'endpoints' => 'Досягнуто ліміт адрес на сайт для вашого тарифу ('.$this->plan($user)->max_addresses_per_site.').',
+            'endpoints' => $this->addressLimitMessage($user, $adding),
         ]);
     }
 
     public function assertCanCreateAddressesOnNewSite(User $user, int $adding): void
     {
-        $max = $this->plan($user)->max_addresses_per_site;
-
-        if ($adding <= $max) {
-            return;
-        }
-
-        throw ValidationException::withMessages([
-            'file' => 'Тариф дозволяє щонайбільше '.$max.' адрес на сайт.',
-        ]);
+        $this->assertPerSiteAddressLimit($this->plan($user), $adding, 'file');
+        $this->assertTotalAddressRoom($user, $adding, 'file');
     }
 
     /**
@@ -71,24 +68,19 @@ final class PlanQuota
      */
     public function assertCanImport(User $user, array $sites): void
     {
-        $remaining = $this->remainingSites($user);
-        $incoming = count($sites);
-
-        if ($incoming > $remaining) {
-            throw ValidationException::withMessages([
-                'file' => 'Імпорт додасть '.$incoming.' сайт(ів), доступно ще '.$remaining.'.',
-            ]);
-        }
-
-        foreach ($sites as $site) {
-            $addresses = $site['addresses'] ?? [];
-            $count = is_array($addresses) ? count($addresses) : 0;
-            $this->assertCanCreateAddressesOnNewSite($user, $count);
-        }
+        $this->assertImportSiteRoom($user, count($sites));
+        $this->assertImportAddressRoom($user, $sites);
     }
 
     /**
-     * @return array{sites_used: int, sites_max: int, can_create_site: bool}
+     * @return array{
+     *     sites_used: int,
+     *     sites_max: int|null,
+     *     can_create_site: bool,
+     *     addresses_used: int,
+     *     addresses_total_max: int|null,
+     *     addresses_per_site_max: int|null
+     * }
      */
     public function siteUsage(User $user): array
     {
@@ -98,7 +90,10 @@ final class PlanQuota
         return [
             'sites_used' => $used,
             'sites_max' => $plan->max_sites,
-            'can_create_site' => $used < $plan->max_sites,
+            'can_create_site' => $this->canCreateSite($user),
+            'addresses_used' => $this->addressCount($user),
+            'addresses_total_max' => $plan->max_addresses_total,
+            'addresses_per_site_max' => $plan->max_addresses_per_site,
         ];
     }
 
@@ -108,10 +103,115 @@ final class PlanQuota
 
         if ($user->plan === null) {
             throw ValidationException::withMessages([
-                'plan' => 'Тариф не призначено. Зверніться до адміністратора.',
+                'plan' => __('plans.quota.missing'),
             ]);
         }
 
         return $user->plan;
+    }
+
+    private function addressCount(User $user): int
+    {
+        return $user->addresses()->count();
+    }
+
+    private function remaining(mixed $max, int $used): ?int
+    {
+        if ($max === null || $max === '') {
+            return null;
+        }
+
+        return max(0, (int) $max - $used);
+    }
+
+    private function hasRoom(?int $remaining, int $needed): bool
+    {
+        return $remaining === null || $remaining >= $needed;
+    }
+
+    private function minRemaining(?int $left, ?int $right): ?int
+    {
+        if ($left === null) {
+            return $right;
+        }
+
+        if ($right === null) {
+            return $left;
+        }
+
+        return min($left, $right);
+    }
+
+    private function addressLimitMessage(User $user, int $adding): string
+    {
+        $plan = $this->plan($user);
+        $totalRemaining = $this->remaining($plan->max_addresses_total, $this->addressCount($user));
+
+        if (! $this->hasRoom($totalRemaining, $adding)) {
+            return __('plans.quota.address_total_limit', ['max' => $plan->max_addresses_total]);
+        }
+
+        return __('plans.quota.address_per_site_limit', ['max' => $plan->max_addresses_per_site]);
+    }
+
+    private function assertPerSiteAddressLimit(Plan $plan, int $adding, string $field): void
+    {
+        $max = $plan->max_addresses_per_site;
+
+        if ($max === null || $max === '' || $adding <= (int) $max) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            $field => __('plans.quota.address_per_site_import', ['max' => $plan->max_addresses_per_site]),
+        ]);
+    }
+
+    private function assertTotalAddressRoom(User $user, int $adding, string $field): void
+    {
+        $plan = $this->plan($user);
+        $remaining = $this->remaining($plan->max_addresses_total, $this->addressCount($user));
+
+        if ($this->hasRoom($remaining, $adding)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            $field => __('plans.quota.address_total_limit', ['max' => $plan->max_addresses_total]),
+        ]);
+    }
+
+    private function assertImportSiteRoom(User $user, int $incoming): void
+    {
+        $remaining = $this->remainingSites($user);
+
+        if ($this->hasRoom($remaining, $incoming)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'file' => __('plans.quota.import_sites', [
+                'incoming' => $incoming,
+                'remaining' => $remaining,
+            ]),
+        ]);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $sites
+     */
+    private function assertImportAddressRoom(User $user, array $sites): void
+    {
+        $plan = $this->plan($user);
+        $adding = 0;
+
+        foreach ($sites as $site) {
+            $addresses = $site['addresses'] ?? [];
+            $count = is_array($addresses) ? count($addresses) : 0;
+            $this->assertPerSiteAddressLimit($plan, $count, 'file');
+            $adding += $count;
+        }
+
+        $this->assertTotalAddressRoom($user, $adding, 'file');
     }
 }

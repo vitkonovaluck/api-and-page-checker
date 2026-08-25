@@ -80,11 +80,37 @@ class Index extends Component
         return view('livewire.sites.index', [
             'sites' => $sites,
             'canCreateSite' => $usage['can_create_site'],
-            'sitesUsed' => $usage['sites_used'],
-            'sitesMax' => $usage['sites_max'],
+            'quotaSummary' => $this->quotaSummary($usage),
             'stoppableSiteIds' => $stopManualCheck->stoppableSiteIds($sites->modelKeys()),
             'checkTimes' => $this->formatCheckTimes($checkStats->averageResponseTimesForSites($sites)),
         ]);
+    }
+
+    /**
+     * @param  array{
+     *     sites_used: int,
+     *     sites_max: int|null,
+     *     addresses_used: int,
+     *     addresses_total_max: int|null,
+     *     addresses_per_site_max: int|null
+     * }  $usage
+     */
+    private function quotaSummary(array $usage): string
+    {
+        $sitesMax = $usage['sites_max'] === null || $usage['sites_max'] === ''
+            ? '∞'
+            : (string) $usage['sites_max'];
+        $parts = ['сайти '.$usage['sites_used'].'/'.$sitesMax];
+
+        if ($usage['addresses_total_max'] !== null && $usage['addresses_total_max'] !== '') {
+            $parts[] = 'адреси '.$usage['addresses_used'].'/'.$usage['addresses_total_max'];
+        }
+
+        if ($usage['addresses_per_site_max'] !== null && $usage['addresses_per_site_max'] !== '') {
+            $parts[] = 'до '.$usage['addresses_per_site_max'].' адрес на сайт';
+        }
+
+        return implode(', ', $parts);
     }
 
     public function checksBusy(): bool

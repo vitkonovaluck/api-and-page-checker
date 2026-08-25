@@ -217,31 +217,45 @@
             </section>
 
             <section id="pricing" class="relative mx-auto w-full max-w-6xl scroll-mt-24 px-4 pb-20 sm:px-6">
-                <div class="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:items-center">
-                    <div>
-                        <p class="text-xs font-medium uppercase tracking-wider text-cyan-300">{{ __('landing.pricing_eyebrow') }}</p>
-                        <h2 class="mt-3 max-w-xl text-3xl font-semibold tracking-tight text-white sm:text-4xl">{{ __('landing.pricing_title') }}</h2>
-                        <p class="mt-4 max-w-xl text-zinc-400">{{ __('landing.pricing_lead') }}</p>
-                    </div>
+                <p class="text-xs font-medium uppercase tracking-wider text-cyan-300">{{ __('landing.pricing_eyebrow') }}</p>
+                <h2 class="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-white sm:text-4xl">{{ __('landing.pricing_title') }}</h2>
+                <p class="mt-4 max-w-2xl text-zinc-400">{{ __('landing.pricing_lead') }}</p>
 
-                    <div class="rounded-2xl border border-cyan-400/30 bg-gradient-to-b from-cyan-400/10 to-transparent p-6">
-                        <p class="text-sm font-medium text-cyan-200">{{ __('landing.pricing_name') }}</p>
-                        <ul class="mt-4 space-y-2 text-sm text-zinc-300">
-                            <li>{{ __('landing.pricing_sites', ['count' => $maxSites]) }}</li>
-                            <li>{{ __('landing.pricing_addresses', ['count' => $maxAddresses]) }}</li>
-                            <li>{{ __('landing.pricing_item_snapshots') }}</li>
-                            <li>{{ __('landing.pricing_item_diffs') }}</li>
-                            <li>{{ __('landing.pricing_item_schedule') }}</li>
-                            <li>{{ __('landing.pricing_item_charts') }}</li>
-                        </ul>
-                        <x-auth-modal-trigger
-                            mode="register"
-                            class="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-400"
-                        >
-                            {{ __('landing.register') }}
-                        </x-auth-modal-trigger>
-                    </div>
+                <div class="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                    @foreach ($plans as $plan)
+                        <article @class([
+                            'flex h-full flex-col gap-4 rounded-2xl border p-6',
+                            'border-cyan-400/30 bg-gradient-to-b from-cyan-400/10 to-transparent' => $plan->slug === $featuredSlug,
+                            'border-white/10 bg-white/5' => $plan->slug !== $featuredSlug,
+                        ])>
+                            @if ($plan->slug === $featuredSlug)
+                                <p class="text-xs font-medium uppercase tracking-wider text-cyan-300">{{ __('landing.pricing_popular') }}</p>
+                            @endif
+                            <p class="text-sm font-medium text-cyan-200">{{ $plan->name }}</p>
+                            <p class="text-2xl font-semibold text-white">{{ $plan->price_label }}</p>
+                            <ul class="space-y-2 text-sm text-zinc-300">
+                                @foreach ($plan->limit_lines as $line)
+                                    <li>{{ $line }}</li>
+                                @endforeach
+                                <li>{{ __('landing.pricing_item_snapshots') }}</li>
+                                <li>{{ __('landing.pricing_item_diffs') }}</li>
+                                <li>{{ __('landing.pricing_item_schedule') }}</li>
+                                <li>{{ __('landing.pricing_item_charts') }}</li>
+                            </ul>
+                            <x-auth-modal-trigger
+                                mode="register"
+                                @class([
+                                    'mt-auto inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-400',
+                                    'bg-cyan-400 text-zinc-950 hover:bg-cyan-300' => $plan->slug === $featuredSlug || $plan->isFree(),
+                                    'border border-white/15 text-zinc-200 hover:border-white/30 hover:text-white' => $plan->slug !== $featuredSlug && ! $plan->isFree(),
+                                ])
+                            >
+                                {{ $plan->isFree() ? __('landing.register') : __('landing.pricing_paid_cta') }}
+                            </x-auth-modal-trigger>
+                        </article>
+                    @endforeach
                 </div>
+                <p class="mt-6 text-sm text-zinc-500">{{ __('landing.pricing_paid_note') }}</p>
             </section>
 
             <section class="relative px-4 pb-20 sm:px-6">
