@@ -24,12 +24,12 @@ class SnapshotChecker
         $this->assertRunAllowsSnapshots($checkRunId);
 
         $previous = $address->snapshots()->orderByDesc('id')->first();
-        $address->loadMissing('site');
+        $address->loadMissing(['site', 'siteToken']);
         $site = $address->site;
         $result = $this->fetcher->request(
             $address->http_method ?? 'GET',
             $address->fullUrl(),
-            $address->request_headers ?? [],
+            $address->resolvedRequestHeaders(),
             $address->supportsRequestBody() ? $address->request_body : null,
             $site->checksPerMinute(),
             'site-'.$site->id,

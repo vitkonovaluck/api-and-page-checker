@@ -60,6 +60,53 @@
                 </div>
             </div>
 
+            <div class="rounded-lg border border-white/10 bg-white/5 p-4">
+                <div class="mb-3 flex items-center justify-between gap-2">
+                    <div>
+                        <h3 class="text-sm font-semibold text-white">Токени</h3>
+                        <p class="mt-0.5 text-xs text-zinc-400">Назва і значення. Підключіть токен у налаштуваннях адреси — він піде як Authorization: Bearer.</p>
+                    </div>
+                    <button
+                        type="button"
+                        wire:click="addTokenRow"
+                        class="rounded-lg border border-white/15 px-2.5 py-1.5 text-xs font-medium text-zinc-200 transition hover:border-white/30 hover:bg-white/5 hover:text-white"
+                    >
+                        Додати
+                    </button>
+                </div>
+                @error('tokens') <p class="mb-2 text-xs text-rose-400">{{ $message }}</p> @enderror
+                <div class="space-y-2">
+                    @foreach ($tokens as $index => $row)
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center" wire:key="token-row-{{ $index }}-{{ $row['id'] ?? 'new' }}">
+                            <input type="hidden" wire:model="tokens.{{ $index }}.id">
+                            <input
+                                type="text"
+                                wire:model="tokens.{{ $index }}.name"
+                                placeholder="Назва"
+                                class="w-full rounded-lg border border-white/15 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 shadow-sm focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/30 sm:w-2/5"
+                            >
+                            <input
+                                type="text"
+                                wire:model="tokens.{{ $index }}.value"
+                                placeholder="Значення"
+                                class="w-full rounded-lg border border-white/15 bg-zinc-950 px-3 py-2 font-mono text-sm text-zinc-100 shadow-sm focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/30 sm:flex-1"
+                            >
+                            <button
+                                type="button"
+                                wire:click="removeTokenRow({{ $index }})"
+                                title="Видалити"
+                                aria-label="Видалити"
+                                class="inline-flex shrink-0 items-center justify-center rounded-lg border border-rose-400/20 p-2 text-rose-300 transition hover:bg-rose-400/10"
+                            >
+                                @include('partials.icons.trash')
+                            </button>
+                        </div>
+                        @error('tokens.'.$index.'.name') <p class="text-xs text-rose-400">{{ $message }}</p> @enderror
+                        @error('tokens.'.$index.'.value') <p class="text-xs text-rose-400">{{ $message }}</p> @enderror
+                    @endforeach
+                </div>
+            </div>
+
             <div
                 class="rounded-lg border border-white/10 bg-white/5 p-4"
                 x-data="{ rpm: {{ (int) $requestsPerMinute }} }"

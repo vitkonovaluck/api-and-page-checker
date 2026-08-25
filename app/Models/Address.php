@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -8,7 +10,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['site_id', 'name', 'endpoint', 'http_method', 'schedule_enabled', 'request_headers', 'request_body', 'last_checked_at'])]
+#[Fillable([
+    'site_id',
+    'name',
+    'endpoint',
+    'http_method',
+    'schedule_enabled',
+    'request_headers',
+    'request_body',
+    'last_checked_at',
+    'site_token_id',
+])]
 class Address extends Model
 {
     public const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
@@ -27,6 +39,27 @@ class Address extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
+    }
+
+    public function siteToken(): BelongsTo
+    {
+        return $this->belongsTo(SiteToken::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function resolvedRequestHeaders(): array
+    {
+        $headers = $this->request_headers ?? [];
+
+        if ($this->siteToken === null) {
+            return $headers;
+        }
+
+        return array_merge($headers, [
+            SiteToken::HEADER_NAME => $this->siteToken->authorizationHeaderValue(),
+        ]);
     }
 
     public function snapshots(): HasMany

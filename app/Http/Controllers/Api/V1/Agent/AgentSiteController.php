@@ -18,7 +18,7 @@ final class AgentSiteController extends Controller
         assert($user instanceof User);
 
         $sites = $user->sites()
-            ->with(['addresses' => fn ($query) => $query->orderBy('id')])
+            ->with(['addresses' => fn ($query) => $query->with('siteToken')->orderBy('id')])
             ->orderBy('id')
             ->get();
 

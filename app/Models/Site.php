@@ -100,6 +100,11 @@ class Site extends Model
         return $this->hasMany(Address::class);
     }
 
+    public function tokens(): HasMany
+    {
+        return $this->hasMany(SiteToken::class);
+    }
+
     public function checkRuns(): HasMany
     {
         return $this->hasMany(CheckRun::class);

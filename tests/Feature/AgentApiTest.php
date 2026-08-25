@@ -8,6 +8,7 @@ use App\Models\Address;
 use App\Models\CheckAgent;
 use App\Models\CheckRun;
 use App\Models\Site;
+use App\Models\SiteToken;
 use App\Models\Snapshot;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -118,6 +119,33 @@ class AgentApiTest extends TestCase
             ->assertJsonPath('data.0.name', 'Own Site')
             ->assertJsonPath('data.0.addresses.0.full_url', 'https://own.example.com/health')
             ->assertJsonMissing(['name' => 'Secret Site']);
+    }
+
+    public function test_sites_catalog_includes_authorization_from_connected_token(): void
+    {
+        $user = User::factory()->create();
+        $site = Site::factory()->create([
+            'user_id' => $user->id,
+            'name' => 'Own Site',
+            'base_url' => 'https://own.example.com',
+        ]);
+        $token = SiteToken::factory()->create([
+            'site_id' => $site->id,
+            'name' => 'Prod',
+            'value' => 'agent-secret',
+        ]);
+        Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/health',
+            'site_token_id' => $token->id,
+            'request_headers' => ['X-Custom' => 'yes'],
+        ]);
+
+        $this->withToken($this->agentToken($user))
+            ->getJson('/api/v1/agent/sites')
+            ->assertOk()
+            ->assertJsonPath('data.0.addresses.0.request_headers.'.SiteToken::HEADER_NAME, 'Bearer agent-secret')
+            ->assertJsonPath('data.0.addresses.0.request_headers.X-Custom', 'yes');
     }
 
     public function test_agent_can_start_a_check_run_and_store_a_snapshot(): void
