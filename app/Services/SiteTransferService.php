@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Address;
 use App\Models\Site;
+use App\Models\SiteToken;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +27,7 @@ final class SiteTransferService
      */
     public function exportSite(Site $site): array
     {
-        $site->load(['addresses' => fn ($query) => $query->orderBy('id')]);
+        $site->load($this->transferRelations());
 
         return $this->wrapPayload([$this->siteToArray($site)]);
     }
@@ -37,7 +38,7 @@ final class SiteTransferService
     public function exportAll(?User $user = null): array
     {
         $query = Site::query()
-            ->with(['addresses' => fn ($query) => $query->orderBy('id')])
+            ->with($this->transferRelations())
             ->orderBy('id');
 
         if ($user !== null) {
@@ -74,7 +75,7 @@ final class SiteTransferService
 
     public function copy(Site $site, User $user): Site
     {
-        $site->load(['addresses' => fn ($query) => $query->orderBy('id')]);
+        $site->load($this->transferRelations());
 
         $this->quota->assertCanCreateSite($user);
         $this->quota->assertCanCreateAddressesOnNewSite($user, $site->addresses->count());
@@ -138,6 +139,13 @@ final class SiteTransferService
             'schedule_enabled' => (bool) $site->schedule_enabled,
             'schedule_interval' => $site->schedule_interval,
             'requests_per_minute' => $site->requests_per_minute,
+            'tokens' => $site->tokens
+                ->map(fn (SiteToken $token): array => [
+                    'name' => $token->name,
+                    'value' => $token->value,
+                ])
+                ->values()
+                ->all(),
             'addresses' => $site->addresses->map($this->addressToArray(...))->values()->all(),
         ];
     }
@@ -154,6 +162,7 @@ final class SiteTransferService
             'schedule_enabled' => (bool) $address->schedule_enabled,
             'request_headers' => $address->request_headers ?? [],
             'request_body' => $address->request_body,
+            'token' => $address->siteToken?->name,
         ];
     }
 
@@ -257,7 +266,12 @@ final class SiteTransferService
         }
 
         $validated = $validator->validated();
-        $validated['addresses'] = $this->validateAddresses($site['addresses'] ?? [], $index);
+        $validated['tokens'] = $this->validateTokens($site['tokens'] ?? [], $index);
+        $validated['addresses'] = $this->validateAddresses(
+            $site['addresses'] ?? [],
+            $index,
+            array_column($validated['tokens'], 'name'),
+        );
 
         return $validated;
     }
@@ -283,9 +297,59 @@ final class SiteTransferService
     }
 
     /**
+     * @return list<array{name: string, value: string}>
+     */
+    private function validateTokens(mixed $tokens, int $siteIndex): array
+    {
+        if ($tokens === null) {
+            return [];
+        }
+
+        if (! is_array($tokens)) {
+            throw ValidationException::withMessages([
+                'file' => 'Сайт #'.($siteIndex + 1).': некоректний список токенів.',
+            ]);
+        }
+
+        $validated = [];
+
+        foreach (array_values($tokens) as $index => $token) {
+            if (! is_array($token)) {
+                throw ValidationException::withMessages([
+                    'file' => 'Сайт #'.($siteIndex + 1).': некоректний токен.',
+                ]);
+            }
+
+            $validator = Validator::make($token, [
+                'name' => ['required', 'string', 'max:255'],
+                'value' => ['required', 'string'],
+            ]);
+
+            if ($validator->fails()) {
+                throw ValidationException::withMessages([
+                    'file' => 'Сайт #'.($siteIndex + 1).', токен #'.($index + 1).': '.$validator->errors()->first(),
+                ]);
+            }
+
+            $validated[] = $validator->validated();
+        }
+
+        $names = array_column($validated, 'name');
+
+        if (count($names) !== count(array_unique($names))) {
+            throw ValidationException::withMessages([
+                'file' => 'Сайт #'.($siteIndex + 1).': назви токенів мають бути унікальними.',
+            ]);
+        }
+
+        return $validated;
+    }
+
+    /**
+     * @param  list<string>  $tokenNames
      * @return list<array<string, mixed>>
      */
-    private function validateAddresses(mixed $addresses, int $siteIndex): array
+    private function validateAddresses(mixed $addresses, int $siteIndex, array $tokenNames): array
     {
         if ($addresses === null) {
             return [];
@@ -300,16 +364,17 @@ final class SiteTransferService
         $validated = [];
 
         foreach (array_values($addresses) as $index => $address) {
-            $validated[] = $this->validateAddressPayload($address, $siteIndex, $index);
+            $validated[] = $this->validateAddressPayload($address, $siteIndex, $index, $tokenNames);
         }
 
         return $validated;
     }
 
     /**
+     * @param  list<string>  $tokenNames
      * @return array<string, mixed>
      */
-    private function validateAddressPayload(mixed $address, int $siteIndex, int $index): array
+    private function validateAddressPayload(mixed $address, int $siteIndex, int $index, array $tokenNames): array
     {
         if (! is_array($address)) {
             throw ValidationException::withMessages([
@@ -327,6 +392,15 @@ final class SiteTransferService
 
         $validated = $validator->validated();
         $validated['request_headers'] = $this->normalizeHeaders($validated['request_headers'] ?? []);
+        $tokenName = $validated['token'] ?? null;
+
+        if ($tokenName !== null && $tokenName !== '' && ! in_array($tokenName, $tokenNames, true)) {
+            throw ValidationException::withMessages([
+                'file' => 'Сайт #'.($siteIndex + 1).', адреса #'.($index + 1).': токен не знайдено.',
+            ]);
+        }
+
+        $validated['token'] = $tokenName === '' ? null : $tokenName;
 
         return $validated;
     }
@@ -343,6 +417,7 @@ final class SiteTransferService
             'schedule_enabled' => ['sometimes', 'boolean'],
             'request_headers' => ['nullable', 'array'],
             'request_body' => ['nullable', 'string'],
+            'token' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -360,17 +435,39 @@ final class SiteTransferService
             'requests_per_minute' => $payload['requests_per_minute'] ?? null,
         ]);
 
-        $this->createAddresses($site, $payload['addresses'] ?? []);
+        $tokenIdsByName = $this->createTokens($site, $payload['tokens'] ?? []);
+        $this->createAddresses($site, $payload['addresses'] ?? [], $tokenIdsByName);
 
         return $site;
     }
 
     /**
-     * @param  list<array<string, mixed>>  $addresses
+     * @param  list<array{name: string, value: string}>  $tokens
+     * @return array<string, int>
      */
-    private function createAddresses(Site $site, array $addresses): void
+    private function createTokens(Site $site, array $tokens): array
+    {
+        $idsByName = [];
+
+        foreach ($tokens as $token) {
+            $created = $site->tokens()->create([
+                'name' => $token['name'],
+                'value' => $token['value'],
+            ]);
+            $idsByName[$created->name] = $created->id;
+        }
+
+        return $idsByName;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $addresses
+     * @param  array<string, int>  $tokenIdsByName
+     */
+    private function createAddresses(Site $site, array $addresses, array $tokenIdsByName): void
     {
         foreach ($addresses as $address) {
+            $tokenName = $address['token'] ?? null;
             $site->addresses()->create([
                 'name' => $address['name'] ?? null,
                 'endpoint' => $this->normalizeEndpoint((string) $address['endpoint']),
@@ -379,6 +476,9 @@ final class SiteTransferService
                 'request_headers' => $address['request_headers'] ?? [],
                 'request_body' => $address['request_body'] ?? null,
                 'last_checked_at' => null,
+                'site_token_id' => is_string($tokenName) && $tokenName !== ''
+                    ? ($tokenIdsByName[$tokenName] ?? null)
+                    : null,
             ]);
         }
     }
@@ -418,6 +518,17 @@ final class SiteTransferService
         }
 
         return $normalized;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function transferRelations(): array
+    {
+        return [
+            'tokens' => fn ($query) => $query->orderBy('id'),
+            'addresses' => fn ($query) => $query->orderBy('id')->with('siteToken'),
+        ];
     }
 
     private function formatName(): string

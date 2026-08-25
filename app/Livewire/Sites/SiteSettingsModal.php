@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Models\Site;
+use App\Models\SiteToken;
 use App\Models\User;
 use App\Services\SiteTransferService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -32,6 +34,9 @@ class SiteSettingsModal extends Component
     /** @var list<int> */
     public array $address_schedule = [];
 
+    /** @var list<array{id: int|null, name: string, value: string}> */
+    public array $tokens = [['id' => null, 'name' => '', 'value' => '']];
+
     public function mount(Site $site): void
     {
         $this->authorize('update', $site);
@@ -43,7 +48,10 @@ class SiteSettingsModal extends Component
     public function open(): void
     {
         $this->site->refresh();
-        $this->site->load(['addresses' => fn ($q) => $q->orderBy('id')]);
+        $this->site->load([
+            'addresses' => fn ($q) => $q->orderBy('id'),
+            'tokens' => fn ($q) => $q->orderBy('id'),
+        ]);
         $this->fillFromSite();
         $this->resetValidation();
         $this->show = true;
@@ -74,7 +82,13 @@ class SiteSettingsModal extends Component
                 'min:'.Site::CHECKS_PER_MINUTE_MIN,
                 'max:'.Site::CHECKS_PER_MINUTE_MAX,
             ],
+            'tokens' => ['nullable', 'array'],
+            'tokens.*.id' => ['nullable', 'integer'],
+            'tokens.*.name' => ['nullable', 'string', 'max:255'],
+            'tokens.*.value' => ['nullable', 'string', 'max:8192'],
         ]);
+
+        $normalizedTokens = $this->normalizedTokenRows($validated['tokens'] ?? []);
 
         $scheduleEnabled = (bool) $this->schedule_enabled;
 
@@ -87,6 +101,8 @@ class SiteSettingsModal extends Component
                 : $this->site->schedule_interval,
             'requests_per_minute' => (int) $validated['requestsPerMinute'],
         ])->save();
+
+        $this->persistTokens($normalizedTokens);
 
         $enabledIds = collect($validated['address_schedule'] ?? [])
             ->map(fn ($id) => (int) $id)
@@ -103,6 +119,21 @@ class SiteSettingsModal extends Component
         $this->show = false;
         session()->flash('success', 'Сайт оновлено.');
         $this->redirect(route('sites.show', $this->site), navigate: true);
+    }
+
+    public function addTokenRow(): void
+    {
+        $this->tokens[] = $this->emptyTokenRow();
+    }
+
+    public function removeTokenRow(int $index): void
+    {
+        unset($this->tokens[$index]);
+        $this->tokens = array_values($this->tokens);
+
+        if ($this->tokens === []) {
+            $this->tokens = [$this->emptyTokenRow()];
+        }
     }
 
     public function updatedScheduleEnabled(): void
@@ -162,6 +193,139 @@ class SiteSettingsModal extends Component
             ->map(fn ($id) => (int) $id)
             ->values()
             ->all();
+        $this->tokens = $this->tokensToRows();
+    }
+
+    /**
+     * @return list<array{id: int|null, name: string, value: string}>
+     */
+    private function tokensToRows(): array
+    {
+        $this->site->loadMissing(['tokens' => fn ($q) => $q->orderBy('id')]);
+
+        $rows = $this->site->tokens
+            ->map(fn (SiteToken $token): array => [
+                'id' => $token->id,
+                'name' => $token->name,
+                'value' => $token->value,
+            ])
+            ->values()
+            ->all();
+
+        return $rows === [] ? [$this->emptyTokenRow()] : $rows;
+    }
+
+    /**
+     * @return array{id: null, name: string, value: string}
+     */
+    private function emptyTokenRow(): array
+    {
+        return ['id' => null, 'name' => '', 'value' => ''];
+    }
+
+    /**
+     * @param  list<array{id?: int|null, name?: string|null, value?: string|null}>  $rows
+     * @return list<array{id: int|null, name: string, value: string}>
+     */
+    private function normalizedTokenRows(array $rows): array
+    {
+        $normalized = [];
+
+        foreach ($rows as $index => $row) {
+            $name = trim((string) ($row['name'] ?? ''));
+            $value = (string) ($row['value'] ?? '');
+            $id = $row['id'] ?? null;
+            $id = $id === null || $id === '' ? null : (int) $id;
+
+            if ($name === '' && $value === '') {
+                continue;
+            }
+
+            if ($name === '' || $value === '') {
+                throw ValidationException::withMessages([
+                    "tokens.{$index}.name" => 'Вкажіть назву і значення токена.',
+                ]);
+            }
+
+            $normalized[] = [
+                'id' => $id,
+                'name' => $name,
+                'value' => $value,
+            ];
+        }
+
+        $names = array_column($normalized, 'name');
+
+        if (count($names) !== count(array_unique($names))) {
+            throw ValidationException::withMessages([
+                'tokens' => 'Назви токенів мають бути унікальними.',
+            ]);
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param  list<array{id: int|null, name: string, value: string}>  $rows
+     */
+    private function persistTokens(array $rows): void
+    {
+        $existingIds = $this->site->tokens()->pluck('id')->map(fn ($id): int => (int) $id)->all();
+        $keptIds = [];
+
+        foreach ($rows as $row) {
+            if ($row['id'] === null) {
+                continue;
+            }
+
+            if (! in_array($row['id'], $existingIds, true)) {
+                throw ValidationException::withMessages([
+                    'tokens' => 'Токен не належить цьому сайту.',
+                ]);
+            }
+
+            $keptIds[] = $row['id'];
+        }
+
+        $deleteQuery = $this->site->tokens();
+
+        if ($keptIds !== []) {
+            $deleteQuery->whereNotIn('id', $keptIds);
+        }
+
+        $deleteQuery->delete();
+
+        foreach ($rows as $row) {
+            $this->upsertToken($row);
+        }
+    }
+
+    /**
+     * @param  array{id: int|null, name: string, value: string}  $row
+     */
+    private function upsertToken(array $row): SiteToken
+    {
+        if ($row['id'] === null) {
+            return $this->site->tokens()->create([
+                'name' => $row['name'],
+                'value' => $row['value'],
+            ]);
+        }
+
+        $token = $this->site->tokens()->whereKey($row['id'])->first();
+
+        if ($token === null) {
+            throw ValidationException::withMessages([
+                'tokens' => 'Токен не належить цьому сайту.',
+            ]);
+        }
+
+        $token->fill([
+            'name' => $row['name'],
+            'value' => $row['value'],
+        ])->save();
+
+        return $token;
     }
 
     private function resolvedRequestsPerMinute(): int

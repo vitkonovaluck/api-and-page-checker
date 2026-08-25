@@ -38,6 +38,7 @@
                 @error('http_method') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
             </div>
             @include('livewire.partials.request-body-editor')
+            @include('livewire.partials.site-token-select', ['fieldId' => 'address-settings-token'])
             <div class="rounded-lg border border-white/10 bg-white/5 p-4">
                 @include('livewire.partials.headers-editor')
             </div>

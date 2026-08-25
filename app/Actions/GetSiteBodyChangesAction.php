@@ -31,7 +31,7 @@ final class GetSiteBodyChangesAction
     private function addressesFor(Site $site): Collection
     {
         return $site->addresses()
-            ->with(['latestSnapshot', 'previousSnapshot'])
+            ->with(['latestSnapshot', 'previousSnapshot', 'siteToken'])
             ->orderBy('id')
             ->get();
     }

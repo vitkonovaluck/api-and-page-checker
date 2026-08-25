@@ -18,13 +18,15 @@ final class AgentAddressResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $this->resource->loadMissing('siteToken');
+
         return [
             'id' => $this->id,
             'name' => $this->name,
             'endpoint' => $this->endpoint,
             'full_url' => $this->fullUrl(),
             'http_method' => $this->http_method ?? 'GET',
-            'request_headers' => $this->request_headers ?? [],
+            'request_headers' => $this->resolvedRequestHeaders(),
             'request_body' => $this->request_body,
             'schedule_enabled' => (bool) $this->schedule_enabled,
         ];
