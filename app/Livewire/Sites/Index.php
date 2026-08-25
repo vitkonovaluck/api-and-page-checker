@@ -8,6 +8,7 @@ use App\Actions\StopManualCheckRunAction;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\CheckingGuard;
+use App\Services\CheckStats;
 use App\Services\PlanQuota;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -60,8 +61,12 @@ class Index extends Component
         $this->syncBusyState($guard);
     }
 
-    public function render(CheckingGuard $guard, PlanQuota $quota, StopManualCheckRunAction $stopManualCheck): View
-    {
+    public function render(
+        CheckingGuard $guard,
+        PlanQuota $quota,
+        StopManualCheckRunAction $stopManualCheck,
+        CheckStats $checkStats,
+    ): View {
         $user = $this->currentUser();
         $sites = $user->sites()
             ->withCount('addresses')
@@ -78,6 +83,7 @@ class Index extends Component
             'sitesUsed' => $usage['sites_used'],
             'sitesMax' => $usage['sites_max'],
             'stoppableSiteIds' => $stopManualCheck->stoppableSiteIds($sites->modelKeys()),
+            'checkTimes' => $checkStats->averageResponseTimesForSites($sites),
         ]);
     }
 

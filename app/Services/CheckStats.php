@@ -190,6 +190,41 @@ class CheckStats
     }
 
     /**
+     * Average response times for the sites list: latest pass, last hour, last 24 hours, all time.
+     *
+     * @param  Collection<int, Site>  $sites
+     * @return array<int, array{
+     *     avg_latest_response_time_ms: int|null,
+     *     avg_hour_response_time_ms: int|null,
+     *     avg_day_response_time_ms: int|null,
+     *     avg_all_response_time_ms: int|null
+     * }>
+     */
+    public function averageResponseTimesForSites(Collection $sites): array
+    {
+        if ($sites->isEmpty()) {
+            return [];
+        }
+
+        $siteIds = $sites->pluck('id')->map(intval(...))->values();
+        $windowed = $this->windowedAveragesBySite($siteIds);
+        $latest = $this->latestPassAveragesBySite($siteIds);
+
+        $stats = [];
+        foreach ($sites as $site) {
+            $siteId = (int) $site->id;
+            $stats[$siteId] = [
+                'avg_latest_response_time_ms' => $latest[$siteId] ?? null,
+                'avg_hour_response_time_ms' => $windowed[$siteId]['avg_hour_response_time_ms'] ?? null,
+                'avg_day_response_time_ms' => $windowed[$siteId]['avg_day_response_time_ms'] ?? null,
+                'avg_all_response_time_ms' => $windowed[$siteId]['avg_all_response_time_ms'] ?? null,
+            ];
+        }
+
+        return $stats;
+    }
+
+    /**
      * @param  Collection<int, Address>  $addresses
      * @return array<int, array{
      *     checks_count: int,
@@ -775,14 +810,206 @@ class CheckStats
         };
     }
 
-    private function runBucketExpression(): string
+    private function runBucketExpression(string $column = 'created_at'): string
     {
         $driver = DB::connection()->getDriverName();
 
         return match ($driver) {
-            'sqlite' => "strftime('%Y-%m-%d %H:%M', created_at)",
-            'pgsql' => "to_char(created_at, 'YYYY-MM-DD HH24:MI')",
-            default => "DATE_FORMAT(created_at, '%Y-%m-%d %H:%i')",
+            'sqlite' => "strftime('%Y-%m-%d %H:%M', {$column})",
+            'pgsql' => "to_char({$column}, 'YYYY-MM-DD HH24:MI')",
+            default => "DATE_FORMAT({$column}, '%Y-%m-%d %H:%i')",
         };
+    }
+
+    /**
+     * @param  Collection<int, int>  $siteIds
+     * @return array<int, array{
+     *     avg_hour_response_time_ms: int|null,
+     *     avg_day_response_time_ms: int|null,
+     *     avg_all_response_time_ms: int|null
+     * }>
+     */
+    private function windowedAveragesBySite(Collection $siteIds): array
+    {
+        return $this->mapWindowedAverageRows(
+            $this->windowedAverageRows($siteIds, now()->subHour(), now()->subHours(24))
+        );
+    }
+
+    /**
+     * @param  Collection<int, int>  $siteIds
+     * @return Collection<int, object>
+     */
+    private function windowedAverageRows(Collection $siteIds, Carbon $hourFrom, Carbon $dayFrom): Collection
+    {
+        return Snapshot::query()
+            ->join('addresses', 'addresses.id', '=', 'snapshots.address_id')
+            ->whereIn('addresses.site_id', $siteIds)
+            ->groupBy('addresses.site_id')
+            ->selectRaw('addresses.site_id as site_id')
+            ->selectRaw('AVG(CASE WHEN snapshots.created_at >= ? THEN snapshots.response_time_ms END) as avg_hour_response_time_ms', [$hourFrom->toDateTimeString()])
+            ->selectRaw('AVG(CASE WHEN snapshots.created_at >= ? THEN snapshots.response_time_ms END) as avg_day_response_time_ms', [$dayFrom->toDateTimeString()])
+            ->selectRaw('AVG(snapshots.response_time_ms) as avg_all_response_time_ms')
+            ->get();
+    }
+
+    /**
+     * @param  Collection<int, object>  $rows
+     * @return array<int, array{
+     *     avg_hour_response_time_ms: int|null,
+     *     avg_day_response_time_ms: int|null,
+     *     avg_all_response_time_ms: int|null
+     * }>
+     */
+    private function mapWindowedAverageRows(Collection $rows): array
+    {
+        $stats = [];
+        foreach ($rows as $row) {
+            $stats[(int) $row->site_id] = [
+                'avg_hour_response_time_ms' => $this->nullableRoundedAvg($row->avg_hour_response_time_ms ?? null),
+                'avg_day_response_time_ms' => $this->nullableRoundedAvg($row->avg_day_response_time_ms ?? null),
+                'avg_all_response_time_ms' => $this->nullableRoundedAvg($row->avg_all_response_time_ms ?? null),
+            ];
+        }
+
+        return $stats;
+    }
+
+    /**
+     * @param  Collection<int, int>  $siteIds
+     * @return array<int, int|null>
+     */
+    private function latestPassAveragesBySite(Collection $siteIds): array
+    {
+        $latestBySite = $this->latestSnapshotsBySite($siteIds);
+        if ($latestBySite->isEmpty()) {
+            return [];
+        }
+
+        return $this->latestRunAveragesBySite($siteIds, $latestBySite)
+            + $this->legacyMinuteAveragesBySite($latestBySite);
+    }
+
+    /**
+     * @param  Collection<int, int>  $siteIds
+     * @return Collection<int, Snapshot>
+     */
+    private function latestSnapshotsBySite(Collection $siteIds): Collection
+    {
+        $latestIds = $this->latestSnapshotIdsBySite($siteIds);
+        if ($latestIds->isEmpty()) {
+            return collect();
+        }
+
+        $snapshots = Snapshot::query()
+            ->whereIn('id', $latestIds->pluck('latest_id'))
+            ->get(['id', 'check_run_id', 'created_at', 'address_id'])
+            ->keyBy('id');
+
+        return $latestIds->mapWithKeys(function (object $row) use ($snapshots): array {
+            $snapshot = $snapshots->get($row->latest_id);
+            if (! $snapshot instanceof Snapshot) {
+                return [];
+            }
+
+            return [(int) $row->site_id => $snapshot];
+        });
+    }
+
+    /**
+     * @param  Collection<int, int>  $siteIds
+     * @return Collection<int, object>
+     */
+    private function latestSnapshotIdsBySite(Collection $siteIds): Collection
+    {
+        return Snapshot::query()
+            ->join('addresses', 'addresses.id', '=', 'snapshots.address_id')
+            ->whereIn('addresses.site_id', $siteIds)
+            ->groupBy('addresses.site_id')
+            ->selectRaw('addresses.site_id as site_id')
+            ->selectRaw('MAX(snapshots.id) as latest_id')
+            ->get();
+    }
+
+    /**
+     * @param  Collection<int, int>  $siteIds
+     * @param  Collection<int, Snapshot>  $latestBySite
+     * @return array<int, int|null>
+     */
+    private function latestRunAveragesBySite(Collection $siteIds, Collection $latestBySite): array
+    {
+        $runIds = $latestBySite
+            ->map(fn (Snapshot $snapshot): ?int => $snapshot->check_run_id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($runIds->isEmpty()) {
+            return [];
+        }
+
+        return Snapshot::query()
+            ->join('addresses', 'addresses.id', '=', 'snapshots.address_id')
+            ->whereIn('addresses.site_id', $siteIds)
+            ->whereIn('snapshots.check_run_id', $runIds)
+            ->groupBy('addresses.site_id')
+            ->selectRaw('addresses.site_id as site_id')
+            ->selectRaw('AVG(snapshots.response_time_ms) as avg_response_time_ms')
+            ->get()
+            ->mapWithKeys(fn (object $row): array => [
+                (int) $row->site_id => $this->nullableRoundedAvg($row->avg_response_time_ms ?? null),
+            ])
+            ->all();
+    }
+
+    /**
+     * @param  Collection<int, Snapshot>  $latestBySite
+     * @return array<int, int|null>
+     */
+    private function legacyMinuteAveragesBySite(Collection $latestBySite): array
+    {
+        $legacy = $latestBySite->filter(
+            fn (Snapshot $snapshot): bool => $snapshot->check_run_id === null
+        );
+        if ($legacy->isEmpty()) {
+            return [];
+        }
+
+        return $this->legacyMinuteAverageRows($legacy)
+            ->mapWithKeys(fn (object $row): array => [
+                (int) $row->site_id => $this->nullableRoundedAvg($row->avg_response_time_ms ?? null),
+            ])
+            ->all();
+    }
+
+    /**
+     * @param  Collection<int, Snapshot>  $legacy
+     * @return Collection<int, object>
+     */
+    private function legacyMinuteAverageRows(Collection $legacy): Collection
+    {
+        return Snapshot::query()
+            ->join('addresses', 'addresses.id', '=', 'snapshots.address_id')
+            ->whereNull('snapshots.check_run_id')
+            ->where(fn (Builder $query) => $this->constrainToLegacyMinuteBuckets($query, $legacy))
+            ->groupBy('addresses.site_id')
+            ->selectRaw('addresses.site_id as site_id')
+            ->selectRaw('AVG(snapshots.response_time_ms) as avg_response_time_ms')
+            ->get();
+    }
+
+    /**
+     * @param  Collection<int, Snapshot>  $legacy
+     */
+    private function constrainToLegacyMinuteBuckets(Builder $query, Collection $legacy): void
+    {
+        foreach ($legacy as $siteId => $snapshot) {
+            $query->orWhere(function (Builder $inner) use ($siteId, $snapshot): void {
+                $inner->where('addresses.site_id', $siteId)
+                    ->whereRaw($this->runBucketExpression('snapshots.created_at').' = ?', [
+                        $snapshot->created_at?->format('Y-m-d H:i') ?? '',
+                    ]);
+            });
+        }
     }
 }
