@@ -32,7 +32,10 @@
                             <th class="px-5 py-3">Базовий URL</th>
                             <th class="px-5 py-3">Адрес</th>
                             <th class="px-5 py-3">Остання перевірка</th>
-                            <th class="px-5 py-3">Сер. час перевірки</th>
+                            <th class="px-5 py-3">
+                                <div>Сер. час перевірки</div>
+                                <div class="mt-0.5 font-normal normal-case tracking-normal text-zinc-500">остання / 1 год / 24 год / разом</div>
+                            </th>
                             <th class="px-5 py-3 text-right">Дії</th>
                         </tr>
                     </thead>
@@ -41,7 +44,6 @@
                             @php
                                 $lastChecked = $site->addresses->max('last_checked_at');
                                 $isChecking = in_array($site->id, $busySiteIds, true);
-                                $times = $checkTimes[$site->id];
                             @endphp
                             <tr
                                 class="align-top hover:bg-white/5 {{ $isChecking ? 'bg-emerald-400/10 hover:bg-emerald-400/10' : '' }}"
@@ -66,12 +68,7 @@
                                 <td class="px-5 py-4 text-zinc-400">
                                     {{ $lastChecked ? \Illuminate\Support\Carbon::parse($lastChecked)->format('d.m.Y H:i:s') : 'ще не перевірявся' }}
                                 </td>
-                                <td class="px-5 py-4 text-xs tabular-nums text-zinc-400">
-                                    <div>остання: {{ $times['avg_latest_response_time_ms'] !== null ? $times['avg_latest_response_time_ms'].' ms' : '—' }}</div>
-                                    <div>1 год: {{ $times['avg_hour_response_time_ms'] !== null ? $times['avg_hour_response_time_ms'].' ms' : '—' }}</div>
-                                    <div>24 год: {{ $times['avg_day_response_time_ms'] !== null ? $times['avg_day_response_time_ms'].' ms' : '—' }}</div>
-                                    <div>разом: {{ $times['avg_all_response_time_ms'] !== null ? $times['avg_all_response_time_ms'].' ms' : '—' }}</div>
-                                </td>
+                                <td class="px-5 py-4 whitespace-nowrap text-xs tabular-nums text-zinc-400">{{ $checkTimes[$site->id] }}</td>
                                 <td class="px-5 py-4">
                                     <div class="flex flex-wrap justify-end gap-1.5">
                                         <x-check-button

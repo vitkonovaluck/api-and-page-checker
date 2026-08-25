@@ -58,10 +58,9 @@ class SitesIndexAverageCheckTimesTest extends TestCase
 
         Livewire::test(Index::class)
             ->assertSee('Сер. час перевірки')
-            ->assertSee('остання: 450 ms')
-            ->assertSee('1 год: 450 ms')
-            ->assertSee('24 год: 300 ms')
-            ->assertSee('разом: 300 ms');
+            ->assertSee('остання / 1 год / 24 год / разом')
+            ->assertSee('450 ms/ 450 ms/ 300 ms/ 300 ms')
+            ->assertDontSee('остання: 450 ms');
     }
 
     public function test_sites_index_shows_em_dash_when_site_has_no_snapshots(): void
@@ -73,10 +72,8 @@ class SitesIndexAverageCheckTimesTest extends TestCase
 
         Livewire::test(Index::class)
             ->assertSee('Сер. час перевірки')
-            ->assertSee('остання: —')
-            ->assertSee('1 год: —')
-            ->assertSee('24 год: —')
-            ->assertSee('разом: —');
+            ->assertSee('остання / 1 год / 24 год / разом')
+            ->assertSee('—/ —/ —/ —');
     }
 
     private function createSnapshot(
