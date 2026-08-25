@@ -58,6 +58,21 @@
 
         <livewire:settings.agent-tokens />
 
+        <section class="rounded-2xl border border-white/10 bg-zinc-900/80 p-5 shadow-xl shadow-cyan-950/20 backdrop-blur-sm">
+            <h2 class="mb-2 text-base font-semibold text-white">{{ __('landing.extension_title') }}</h2>
+            <p class="mb-4 text-sm text-zinc-400">
+                {{ __('landing.extension_lead') }}
+            </p>
+            <a
+                href="{{ route('extension.chrome') }}"
+                class="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-300"
+            >
+                @include('partials.icons.download')
+                {{ __('landing.extension_download') }}
+            </a>
+            <p class="mt-3 text-xs text-zinc-500">{{ __('landing.extension_download_hint') }}</p>
+        </section>
+
         @if ($isAdmin)
         <section class="rounded-2xl border border-white/10 bg-zinc-900/80 p-5 shadow-xl shadow-cyan-950/20 backdrop-blur-sm">
             <h2 class="mb-2 text-base font-semibold text-white">Бекап бази даних</h2>

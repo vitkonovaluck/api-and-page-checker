@@ -88,6 +88,31 @@ return [
     'agent_snapshot_body_max_kb' => (int) env('AGENT_SNAPSHOT_BODY_MAX_KB', 1024),
     /*
     |--------------------------------------------------------------------------
+    | Agent address import (browser extension)
+    |--------------------------------------------------------------------------
+    |
+    | Maximum number of endpoints accepted in one import request, and the
+    | stored endpoint length (must stay within the addresses.endpoint column).
+    |
+    */
+    'agent_import_addresses_max' => (int) env('AGENT_IMPORT_ADDRESSES_MAX', 500),
+    'agent_import_endpoint_raw_max' => (int) env('AGENT_IMPORT_ENDPOINT_RAW_MAX', 2048),
+    'address_endpoint_max' => (int) env('ADDRESS_ENDPOINT_MAX', 766),
+    /*
+    |--------------------------------------------------------------------------
+    | Chrome / Edge recorder download
+    |--------------------------------------------------------------------------
+    |
+    | GET /extension/chrome zips these files and injects this server's URL
+    | so the unpacked extension can sign in without typing the checker address.
+    | Unpacked installs default to the production host in extension/defaults.js.
+    |
+    */
+    'extension_directory' => base_path('extension'),
+    'extension_zip_filename' => env('EXTENSION_ZIP_FILENAME', 'api-checker-recorder.zip'),
+    'extension_login_ttl_seconds' => (int) env('EXTENSION_LOGIN_TTL_SECONDS', 300),
+    /*
+    |--------------------------------------------------------------------------
     | Delete a check run's snapshots
     |--------------------------------------------------------------------------
     |

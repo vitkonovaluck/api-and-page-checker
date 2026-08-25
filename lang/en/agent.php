@@ -13,4 +13,9 @@ return [
     'address_not_in_run' => 'The address does not belong to this check run.',
     'snapshot_duplicate' => 'A snapshot for this address already exists in the check run.',
     'logged_out' => 'Agent token revoked.',
+    'extension_login_expired' => 'This extension sign-in expired. Start again from the extension.',
+    'extension_connected_title' => 'Розширення підключено',
+    'extension_connected_body' => 'Можна закрити цю вкладку й знову відкрити іконку API Checker Recorder.',
+    'extension_connected_failed_title' => 'Не вдалося підключити розширення',
+    'extension_connected_failed_body' => 'Закрийте вкладку й спробуйте увійти через соцмережу ще раз у розширенні.',
 ];

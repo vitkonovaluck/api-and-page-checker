@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "API Checker Recorder",
+  "version": "1.0.0",
+  "description": "Record visited paths and import them as site addresses in API Checker.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "API Checker Recorder"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "storage",
+    "webNavigation",
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ]
+}
