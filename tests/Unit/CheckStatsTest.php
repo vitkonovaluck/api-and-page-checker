@@ -11,6 +11,7 @@ use App\Models\Site;
 use App\Models\Snapshot;
 use App\Services\CheckStats;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class CheckStatsTest extends TestCase
@@ -478,6 +479,144 @@ class CheckStatsTest extends TestCase
         $this->assertSame(2, $stats['checks_count']);
         $this->assertSame(2, $stats['runs_count']);
         $this->assertSame(0.5, $stats['avg_errors_per_run']);
+    }
+
+    public function test_list_averages_return_empty_array_for_no_sites(): void
+    {
+        $stats = app(CheckStats::class)->averageResponseTimesForSites(collect());
+
+        $this->assertSame([], $stats);
+    }
+
+    public function test_list_averages_are_null_when_site_has_no_snapshots(): void
+    {
+        $site = Site::factory()->create([
+            'name' => 'Empty',
+            'base_url' => 'https://api.example.com',
+        ]);
+
+        $stats = app(CheckStats::class)->averageResponseTimesForSites(collect([$site]));
+
+        $this->assertSame([
+            'avg_latest_response_time_ms' => null,
+            'avg_hour_response_time_ms' => null,
+            'avg_day_response_time_ms' => null,
+            'avg_all_response_time_ms' => null,
+        ], $stats[$site->id]);
+    }
+
+    public function test_list_averages_use_hour_day_and_all_windows(): void
+    {
+        Carbon::setTestNow('2026-08-25 12:00:00');
+
+        try {
+            $site = Site::factory()->create([
+                'name' => 'Windows',
+                'base_url' => 'https://api.example.com',
+            ]);
+            $address = Address::query()->create([
+                'site_id' => $site->id,
+                'endpoint' => '/data',
+            ]);
+
+            $this->createSnapshot($address, 100, null, '2026-08-25 11:30:00');
+            $this->createSnapshot($address, 300, null, '2026-08-25 06:00:00');
+            $this->createSnapshot($address, 500, null, '2026-08-23 12:00:00');
+
+            $stats = app(CheckStats::class)->averageResponseTimesForSites(collect([$site]));
+
+            $this->assertSame(100, $stats[$site->id]['avg_hour_response_time_ms']);
+            $this->assertSame(200, $stats[$site->id]['avg_day_response_time_ms']);
+            $this->assertSame(300, $stats[$site->id]['avg_all_response_time_ms']);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_list_latest_average_uses_only_the_last_check_run(): void
+    {
+        $site = Site::factory()->create([
+            'name' => 'Demo',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $a1 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/one',
+        ]);
+        $a2 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/two',
+        ]);
+        $a3 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/three',
+        ]);
+
+        $previousRun = CheckRun::start($site, CheckRun::SOURCE_MANUAL);
+        $latestRun = CheckRun::start($site, CheckRun::SOURCE_MANUAL);
+
+        $this->createSnapshot($a1, 100, null, '2026-08-01 10:00:00', $previousRun->id);
+        $this->createSnapshot($a2, 200, null, '2026-08-01 10:00:01', $previousRun->id);
+        $this->createSnapshot($a3, 300, null, '2026-08-01 10:00:02', $previousRun->id);
+        $this->createSnapshot($a1, 400, null, '2026-08-01 11:00:00', $latestRun->id);
+        $this->createSnapshot($a2, 500, null, '2026-08-01 11:00:01', $latestRun->id);
+
+        $stats = app(CheckStats::class)->averageResponseTimesForSites(collect([$site]));
+
+        $this->assertSame(450, $stats[$site->id]['avg_latest_response_time_ms']);
+    }
+
+    public function test_list_latest_average_uses_legacy_minute_bucket_without_check_run(): void
+    {
+        $site = Site::factory()->create([
+            'name' => 'Legacy',
+            'base_url' => 'https://api.example.com',
+        ]);
+        $a1 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/one',
+        ]);
+        $a2 = Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/two',
+        ]);
+
+        $this->createSnapshot($a1, 100, null, '2026-08-01 10:00:00');
+        $this->createSnapshot($a1, 400, null, '2026-08-01 11:00:00');
+        $this->createSnapshot($a2, 200, null, '2026-08-01 10:00:00');
+        $this->createSnapshot($a2, 300, null, '2026-08-01 11:00:00');
+
+        $stats = app(CheckStats::class)->averageResponseTimesForSites(collect([$site]));
+
+        $this->assertSame(350, $stats[$site->id]['avg_latest_response_time_ms']);
+    }
+
+    public function test_list_averages_ignore_sites_not_in_the_collection(): void
+    {
+        $included = Site::factory()->create([
+            'name' => 'Included',
+            'base_url' => 'https://included.example.com',
+        ]);
+        $excluded = Site::factory()->create([
+            'name' => 'Excluded',
+            'base_url' => 'https://excluded.example.com',
+        ]);
+        $includedAddress = Address::query()->create([
+            'site_id' => $included->id,
+            'endpoint' => '/in',
+        ]);
+        $excludedAddress = Address::query()->create([
+            'site_id' => $excluded->id,
+            'endpoint' => '/out',
+        ]);
+
+        $this->createSnapshot($includedAddress, 120, null, '2026-08-01 10:00:00');
+        $this->createSnapshot($excludedAddress, 900, null, '2026-08-01 10:00:00');
+
+        $stats = app(CheckStats::class)->averageResponseTimesForSites(collect([$included]));
+
+        $this->assertArrayNotHasKey($excluded->id, $stats);
+        $this->assertSame(120, $stats[$included->id]['avg_all_response_time_ms']);
     }
 
     private function createSnapshot(
