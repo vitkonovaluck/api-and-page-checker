@@ -45,5 +45,8 @@ return [
         'user' => 'User',
         'admin' => 'Admin',
     ],
+    'navigation' => [
+        'settings' => 'Settings',
+    ],
     'open_app' => 'Open app',
 ];

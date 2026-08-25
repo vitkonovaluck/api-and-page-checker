@@ -8,8 +8,49 @@ mkdir -p \
     storage/framework/views \
     bootstrap/cache
 
-if [ "${COMPOSER_INSTALL:-false}" = "true" ] || [ ! -f vendor/autoload.php ]; then
-    composer install --no-interaction --prefer-dist --no-ansi
+composer_lock_hash_file="vendor/.composer-lock-hash"
+
+composer_lock_hash() {
+    if [ ! -f composer.lock ]; then
+        echo ""
+        return 0
+    fi
+
+    md5sum composer.lock | awk '{print $1}'
+}
+
+vendor_needs_composer_install() {
+    if [ "${COMPOSER_INSTALL:-false}" = "true" ]; then
+        return 0
+    fi
+
+    if [ ! -f vendor/autoload.php ]; then
+        return 0
+    fi
+
+    if [ ! -f composer.lock ]; then
+        return 1
+    fi
+
+    current_hash="$(composer_lock_hash)"
+    stored_hash=""
+    if [ -f "${composer_lock_hash_file}" ]; then
+        stored_hash="$(cat "${composer_lock_hash_file}")"
+    fi
+
+    [ "${current_hash}" != "${stored_hash}" ]
+}
+
+mkdir -p vendor
+
+if vendor_needs_composer_install; then
+    (
+        flock -w 180 9
+        if vendor_needs_composer_install; then
+            composer install --no-interaction --prefer-dist --no-ansi
+            composer_lock_hash > "${composer_lock_hash_file}"
+        fi
+    ) 9>vendor/.composer-install.lock
 fi
 
 # Vite HMR file would make Laravel skip built assets inside containers.

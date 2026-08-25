@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use App\Models\User;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -19,6 +20,7 @@ use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Microcode\FilamentLogHub\FilamentLogHubPlugin;
 
 final class AdminPanelProvider extends PanelProvider
 {
@@ -43,6 +45,16 @@ final class AdminPanelProvider extends PanelProvider
             ->widgets([
                 AccountWidget::class,
             ])
+            ->plugin(
+                FilamentLogHubPlugin::make()
+                    ->authorize(function (): bool {
+                        $user = auth()->user();
+
+                        return $user instanceof User && $user->isAdmin();
+                    })
+                    ->navigationGroup(__('admin.navigation.settings'))
+                    ->navigationSort(40)
+            )
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
