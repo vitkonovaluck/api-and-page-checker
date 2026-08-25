@@ -83,13 +83,42 @@ class Index extends Component
             'sitesUsed' => $usage['sites_used'],
             'sitesMax' => $usage['sites_max'],
             'stoppableSiteIds' => $stopManualCheck->stoppableSiteIds($sites->modelKeys()),
-            'checkTimes' => $checkStats->averageResponseTimesForSites($sites),
+            'checkTimes' => $this->formatCheckTimes($checkStats->averageResponseTimesForSites($sites)),
         ]);
     }
 
     public function checksBusy(): bool
     {
         return $this->checksBusy;
+    }
+
+    /**
+     * @param  array<int, array{
+     *     avg_latest_response_time_ms: int|null,
+     *     avg_hour_response_time_ms: int|null,
+     *     avg_day_response_time_ms: int|null,
+     *     avg_all_response_time_ms: int|null
+     * }>  $checkTimes
+     * @return array<int, string>
+     */
+    private function formatCheckTimes(array $checkTimes): array
+    {
+        $formatted = [];
+        foreach ($checkTimes as $siteId => $times) {
+            $formatted[$siteId] = implode('/ ', [
+                $this->formatAverageMs($times['avg_latest_response_time_ms']),
+                $this->formatAverageMs($times['avg_hour_response_time_ms']),
+                $this->formatAverageMs($times['avg_day_response_time_ms']),
+                $this->formatAverageMs($times['avg_all_response_time_ms']),
+            ]);
+        }
+
+        return $formatted;
+    }
+
+    private function formatAverageMs(?int $milliseconds): string
+    {
+        return $milliseconds !== null ? $milliseconds.' ms' : '—';
     }
 
     /**
