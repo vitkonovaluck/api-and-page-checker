@@ -105,10 +105,12 @@ return [
     |
     | GET /extension/chrome zips these files and injects this server's URL
     | so the unpacked extension can sign in without typing the checker address.
+    | Unpacked installs default to the production host in extension/defaults.js.
     |
     */
     'extension_directory' => base_path('extension'),
     'extension_zip_filename' => env('EXTENSION_ZIP_FILENAME', 'api-checker-recorder.zip'),
+    'extension_login_ttl_seconds' => (int) env('EXTENSION_LOGIN_TTL_SECONDS', 300),
     /*
     |--------------------------------------------------------------------------
     | Delete a check run's snapshots

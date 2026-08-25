@@ -7,6 +7,8 @@ use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\SocialAuthController;
 use App\Http\Controllers\CheckController;
 use App\Http\Controllers\ChromeExtensionController;
+use App\Http\Controllers\ExtensionAuthController;
+use App\Http\Controllers\ExtensionConnectedController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SiteController;
@@ -19,6 +21,11 @@ use Illuminate\Support\Facades\Route;
 Route::get('/extension/chrome', ChromeExtensionController::class)
     ->middleware('throttle:extension-download')
     ->name('extension.chrome');
+Route::get('/extension/connected', ExtensionConnectedController::class)
+    ->name('extension.connected');
+Route::get('/extension/auth/{provider}', ExtensionAuthController::class)
+    ->middleware('throttle:extension-login')
+    ->name('extension.auth');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/', HomeController::class)->name('home');

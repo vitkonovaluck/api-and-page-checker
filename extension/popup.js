@@ -12,12 +12,28 @@ const toggleRecordButton = document.getElementById('toggle-record');
 const saveButton = document.getElementById('save');
 const logoutButton = document.getElementById('logout');
 const messageEl = document.getElementById('message');
+const socialLogin = document.getElementById('social-login');
+const socialButtons = document.getElementById('social-buttons');
 
 /** @type {{ id: number, name: string, base_url: string }[]} */
 let sites = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   void boot();
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local') {
+    return;
+  }
+
+  if (changes.token || changes.socialError) {
+    void boot();
+  }
+});
+
+apiBaseUrlInput.addEventListener('change', () => {
+  void loadProviders(normalizeBaseUrl(apiBaseUrlInput.value));
 });
 
 loginForm.addEventListener('submit', (event) => {
@@ -42,10 +58,16 @@ logoutButton.addEventListener('click', () => {
 });
 
 async function boot() {
-  const stored = await chrome.storage.local.get(['apiBaseUrl', 'token', 'agentName', 'site']);
+  const stored = await chrome.storage.local.get(['apiBaseUrl', 'token', 'agentName', 'site', 'socialError']);
   const fallbackUrl = typeof DEFAULT_API_BASE_URL === 'string' ? DEFAULT_API_BASE_URL : '';
   apiBaseUrlInput.value = stored.apiBaseUrl || fallbackUrl;
   agentNameInput.value = stored.agentName || 'Chrome';
+  await loadProviders(normalizeBaseUrl(apiBaseUrlInput.value));
+
+  if (typeof stored.socialError === 'string' && stored.socialError !== '') {
+    showMessage(stored.socialError, 'error');
+    await chrome.storage.local.remove(['socialError']);
+  }
 
   if (!stored.token) {
     showLoggedOut();
@@ -88,26 +110,104 @@ async function signIn() {
       return;
     }
 
-    await chrome.storage.local.set({
-      apiBaseUrl,
-      token: payload.token,
-      agentName,
-    });
-
-    const loaded = await loadSites(apiBaseUrl, payload.token);
-
-    if (!loaded) {
-      return;
-    }
-
-    passwordInput.value = '';
-    selectSite(null);
-    await persistSelectedSite();
-    await refreshRecorderState();
-    showLoggedIn();
-    showMessage('Signed in. Choose a site and start recording.', 'ok');
+    await finishSignIn(apiBaseUrl, payload.token, agentName);
   } catch {
     showMessage('Could not reach the checker. Check the URL.', 'error');
+  }
+}
+
+/**
+ * @param {string} apiBaseUrl
+ * @param {string} token
+ * @param {string} agentName
+ */
+async function finishSignIn(apiBaseUrl, token, agentName) {
+  await chrome.storage.local.set({
+    apiBaseUrl,
+    token,
+    agentName,
+  });
+  await chrome.storage.local.remove(['socialTicket', 'socialError']);
+
+  const loaded = await loadSites(apiBaseUrl, token);
+
+  if (!loaded) {
+    return;
+  }
+
+  passwordInput.value = '';
+  selectSite(null);
+  await persistSelectedSite();
+  await refreshRecorderState();
+  showLoggedIn();
+  showMessage('Signed in. Choose a site and start recording.', 'ok');
+}
+
+/**
+ * @param {string} apiBaseUrl
+ */
+async function loadProviders(apiBaseUrl) {
+  socialButtons.replaceChildren();
+  socialLogin.classList.add('hidden');
+
+  if (apiBaseUrl === '') {
+    return;
+  }
+
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/v1/agent/providers`, {
+      headers: { Accept: 'application/json' },
+    });
+    const payload = await response.json();
+    const rows = Array.isArray(payload.data) ? payload.data : [];
+
+    for (const row of rows) {
+      if (!row || typeof row.id !== 'string' || typeof row.label !== 'string') {
+        continue;
+      }
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'secondary';
+      button.textContent = `Sign in with ${row.label}`;
+      button.addEventListener('click', () => {
+        void startSocialLogin(row.id);
+      });
+      socialButtons.append(button);
+    }
+
+    if (socialButtons.childElementCount > 0) {
+      socialLogin.classList.remove('hidden');
+    }
+  } catch {
+    socialLogin.classList.add('hidden');
+  }
+}
+
+/**
+ * @param {string} provider
+ */
+async function startSocialLogin(provider) {
+  clearMessage();
+  const apiBaseUrl = normalizeBaseUrl(apiBaseUrlInput.value);
+  const agentName = agentNameInput.value.trim() || 'Chrome';
+
+  if (apiBaseUrl === '') {
+    showMessage('Enter the checker URL first.', 'error');
+    return;
+  }
+
+  showMessage('Finish signing in in the new tab, then reopen this popup.', 'ok');
+
+  const result = await sendMessage({
+    type: 'socialLogin',
+    apiBaseUrl,
+    provider,
+    agentName,
+  });
+
+  if (!result?.ok) {
+    showMessage(typeof result?.error === 'string' ? result.error : 'Could not start social sign-in.', 'error');
   }
 }
 

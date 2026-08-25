@@ -78,6 +78,27 @@
         .row > * {
             flex: 1;
         }
+        .divider {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            gap: 8px;
+            margin: 4px 0 0;
+            color: #71717a;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .divider::before,
+        .divider::after {
+            content: "";
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        #social-buttons {
+            display: grid;
+            gap: 8px;
+        }
         .status {
             border-radius: 8px;
             padding: 8px 10px;
@@ -111,7 +132,7 @@
         <form id="login-form">
             <label>
                 Checker URL
-                <input id="api-base-url" type="url" required placeholder="http://localhost:8180">
+                <input id="api-base-url" type="url" required placeholder="https://api-checker.microcode.vn.ua">
             </label>
             <label>
                 Email
@@ -126,6 +147,10 @@
                 <input id="agent-name" type="text" required maxlength="255" value="Chrome">
             </label>
             <button class="primary" type="submit">Sign in</button>
+            <div id="social-login" class="hidden">
+                <p class="divider">or</p>
+                <div id="social-buttons"></div>
+            </div>
         </form>
         <div id="session" class="hidden">
             <label>

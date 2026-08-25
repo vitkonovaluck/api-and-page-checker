@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\Agent\AgentAddressController;
 use App\Http\Controllers\Api\V1\Agent\AgentCheckRunController;
+use App\Http\Controllers\Api\V1\Agent\AgentExtensionLoginController;
 use App\Http\Controllers\Api\V1\Agent\AgentLoginController;
 use App\Http\Controllers\Api\V1\Agent\AgentLogoutController;
 use App\Http\Controllers\Api\V1\Agent\AgentMeController;
+use App\Http\Controllers\Api\V1\Agent\AgentProviderController;
 use App\Http\Controllers\Api\V1\Agent\AgentSiteBodyChangeController;
 use App\Http\Controllers\Api\V1\Agent\AgentSiteController;
 use App\Http\Controllers\Api\V1\Agent\AgentSnapshotController;
@@ -16,6 +18,15 @@ Route::prefix('v1/agent')->name('v1.agent.')->group(function (): void {
     Route::post('/login', [AgentLoginController::class, 'store'])
         ->middleware('throttle:agent-login')
         ->name('login');
+    Route::get('/providers', [AgentProviderController::class, 'index'])
+        ->middleware('throttle:extension-login')
+        ->name('providers');
+    Route::post('/extension-logins', [AgentExtensionLoginController::class, 'store'])
+        ->middleware('throttle:extension-login')
+        ->name('extension-logins.store');
+    Route::get('/extension-logins/{ticket}', [AgentExtensionLoginController::class, 'show'])
+        ->middleware('throttle:extension-login')
+        ->name('extension-logins.show');
 
     Route::middleware([
         'auth:sanctum',

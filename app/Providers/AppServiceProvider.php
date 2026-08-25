@@ -65,6 +65,10 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(30)->by($request->ip() ?? 'extension-download');
         });
 
+        RateLimiter::for('extension-login', function (Request $request) {
+            return Limit::perMinute(20)->by($request->ip() ?? 'extension-login');
+        });
+
         $this->shareColorScheme();
     }
 
