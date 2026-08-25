@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\V1\Agent\AgentAddressController;
 use App\Http\Controllers\Api\V1\Agent\AgentCheckRunController;
 use App\Http\Controllers\Api\V1\Agent\AgentLoginController;
 use App\Http\Controllers\Api\V1\Agent\AgentLogoutController;
@@ -24,6 +25,8 @@ Route::prefix('v1/agent')->name('v1.agent.')->group(function (): void {
     ])->group(function (): void {
         Route::get('/me', [AgentMeController::class, 'show'])->name('me');
         Route::get('/sites', [AgentSiteController::class, 'index'])->name('sites');
+        Route::post('/sites/{site}/addresses', [AgentAddressController::class, 'store'])
+            ->name('sites.addresses.store');
         Route::get('/sites/{site}/body-changes', [AgentSiteBodyChangeController::class, 'index'])
             ->name('sites.body-changes');
         Route::post('/check-runs', [AgentCheckRunController::class, 'store'])->name('check-runs.store');

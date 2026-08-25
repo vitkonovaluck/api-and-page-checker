@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>API Checker Recorder</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            font-family: ui-sans-serif, system-ui, sans-serif;
+        }
+        body {
+            margin: 0;
+            width: 320px;
+            background: #18181b;
+            color: #f4f4f5;
+        }
+        main {
+            display: grid;
+            gap: 12px;
+            padding: 16px;
+        }
+        h1 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        p {
+            margin: 0;
+            font-size: 12px;
+            color: #a1a1aa;
+        }
+        label {
+            display: grid;
+            gap: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        input, select {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            background: #09090b;
+            color: #f4f4f5;
+            padding: 8px 10px;
+            font-size: 13px;
+        }
+        button {
+            border: 0;
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        .primary {
+            background: #22d3ee;
+            color: #09090b;
+        }
+        .secondary {
+            background: transparent;
+            color: #e4e4e7;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .danger {
+            background: #f43f5e;
+            color: #fff;
+        }
+        .row {
+            display: flex;
+            gap: 8px;
+        }
+        .row > * {
+            flex: 1;
+        }
+        .status {
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 12px;
+        }
+        .status.error {
+            background: rgba(244, 63, 94, 0.15);
+            color: #fecdd3;
+        }
+        .status.ok {
+            background: rgba(34, 211, 238, 0.12);
+            color: #a5f3fc;
+        }
+        .hidden {
+            display: none;
+        }
+        .count {
+            font-variant-numeric: tabular-nums;
+            color: #22d3ee;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <div>
+            <h1>API Checker Recorder</h1>
+            <p>Record visited paths, then import them as addresses.</p>
+        </div>
+        <p id="message" class="status hidden" role="status"></p>
+        <form id="login-form">
+            <label>
+                Checker URL
+                <input id="api-base-url" type="url" required placeholder="http://localhost:8180">
+            </label>
+            <label>
+                Email
+                <input id="email" type="email" required autocomplete="username">
+            </label>
+            <label>
+                Password
+                <input id="password" type="password" required autocomplete="current-password">
+            </label>
+            <label>
+                Agent name
+                <input id="agent-name" type="text" required maxlength="255" value="Chrome">
+            </label>
+            <button class="primary" type="submit">Sign in</button>
+        </form>
+        <div id="session" class="hidden">
+            <label>
+                Site
+                <select id="site"></select>
+            </label>
+            <p>Recorded this session: <span id="pending-count" class="count">0</span></p>
+            <div class="row">
+                <button id="toggle-record" class="primary" type="button">Start recording</button>
+                <button id="save" class="secondary" type="button">Save</button>
+            </div>
+            <button id="logout" class="secondary" type="button">Sign out</button>
+        </div>
+    </main>
+    <script src="defaults.js"></script>
+    <script src="popup.js"></script>
+</body>
+</html>

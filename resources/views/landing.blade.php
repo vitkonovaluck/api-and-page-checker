@@ -19,6 +19,7 @@
                 <nav class="hidden items-center gap-6 text-sm text-zinc-300 md:flex" aria-label="{{ __('landing.brand') }}">
                     <a href="#features" class="transition hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-400">{{ __('landing.nav_features') }}</a>
                     <a href="#how" class="transition hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-400">{{ __('landing.nav_how') }}</a>
+                    <a href="#extension" class="transition hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-400">{{ __('landing.nav_extension') }}</a>
                     <a href="#pricing" class="transition hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-400">{{ __('landing.nav_pricing') }}</a>
                 </nav>
 
@@ -46,6 +47,7 @@
                         <div class="absolute right-0 mt-2 w-52 rounded-xl border border-white/10 bg-zinc-900 p-3 shadow-xl">
                             <a href="#features" class="block rounded-lg px-3 py-2 text-sm text-zinc-200 hover:bg-white/5">{{ __('landing.nav_features') }}</a>
                             <a href="#how" class="block rounded-lg px-3 py-2 text-sm text-zinc-200 hover:bg-white/5">{{ __('landing.nav_how') }}</a>
+                            <a href="#extension" class="block rounded-lg px-3 py-2 text-sm text-zinc-200 hover:bg-white/5">{{ __('landing.nav_extension') }}</a>
                             <a href="#pricing" class="block rounded-lg px-3 py-2 text-sm text-zinc-200 hover:bg-white/5">{{ __('landing.nav_pricing') }}</a>
                             <x-auth-modal-trigger mode="login" class="mt-1 block rounded-lg px-3 py-2 text-sm text-zinc-200 hover:bg-white/5">
                                 {{ __('landing.login') }}
@@ -187,6 +189,33 @@
                 </ol>
             </section>
 
+            <section id="extension" class="relative mx-auto w-full max-w-6xl scroll-mt-24 px-4 pb-20 sm:px-6">
+                <div class="grid gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-center">
+                    <div>
+                        <p class="text-xs font-medium uppercase tracking-wider text-cyan-300">{{ __('landing.extension_eyebrow') }}</p>
+                        <h2 class="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-white sm:text-4xl">{{ __('landing.extension_title') }}</h2>
+                        <p class="mt-4 max-w-2xl text-zinc-400">{{ __('landing.extension_lead') }}</p>
+                        <a
+                            href="{{ route('extension.chrome') }}"
+                            class="mt-8 inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-400"
+                        >
+                            @include('partials.icons.download')
+                            {{ __('landing.extension_download') }}
+                        </a>
+                        <p class="mt-3 max-w-xl text-xs text-zinc-500">{{ __('landing.extension_download_hint') }}</p>
+                    </div>
+                    <ol class="grid gap-3 sm:grid-cols-2">
+                        @foreach (__('landing.extension_steps') as $index => $step)
+                            <li class="rounded-2xl border border-white/10 bg-zinc-900/60 p-5">
+                                <span class="font-mono text-sm text-cyan-300">0{{ $index + 1 }}</span>
+                                <h3 class="mt-3 text-base font-semibold text-white">{{ $step['title'] }}</h3>
+                                <p class="mt-2 text-sm leading-relaxed text-zinc-400">{{ $step['body'] }}</p>
+                            </li>
+                        @endforeach
+                    </ol>
+                </div>
+            </section>
+
             <section id="pricing" class="relative mx-auto w-full max-w-6xl scroll-mt-24 px-4 pb-20 sm:px-6">
                 <div class="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:items-center">
                     <div>
@@ -234,6 +263,7 @@
             <div class="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-zinc-500 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                 <p>{{ __('landing.brand') }} · {{ now()->year }} · {{ __('landing.footer_tagline') }}</p>
                 <div class="flex gap-4">
+                    <a href="{{ route('extension.chrome') }}" class="hover:text-zinc-300">{{ __('landing.nav_extension') }}</a>
                     <x-auth-modal-trigger mode="login" class="hover:text-zinc-300">{{ __('landing.login') }}</x-auth-modal-trigger>
                     <x-auth-modal-trigger mode="register" class="hover:text-zinc-300">{{ __('landing.register') }}</x-auth-modal-trigger>
                 </div>

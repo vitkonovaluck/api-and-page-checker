@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Models\Address;
 use App\Models\CheckAgent;
 use App\Models\CheckRun;
+use App\Models\Plan;
 use App\Models\Site;
 use App\Models\SiteToken;
 use App\Models\Snapshot;
@@ -286,6 +287,119 @@ class AgentApiTest extends TestCase
         $this->withToken($token)
             ->getJson('/api/v1/agent/me')
             ->assertUnauthorized();
+    }
+
+    public function test_agent_can_import_endpoints_and_skip_existing(): void
+    {
+        $user = User::factory()->create();
+        $site = Site::factory()->create([
+            'user_id' => $user->id,
+            'base_url' => 'https://shop.example.com',
+        ]);
+        Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/catalog',
+        ]);
+
+        $this->withToken($this->agentToken($user))
+            ->postJson('/api/v1/agent/sites/'.$site->id.'/addresses', [
+                'endpoints' => ['/catalog', '/product/12', '/product/12', 'https://shop.example.com/about?ref=nav'],
+                'schedule_enabled' => true,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('created', 2)
+            ->assertJsonPath('skipped', 2)
+            ->assertJsonPath('addresses.0.http_method', 'GET')
+            ->assertJsonPath('addresses.0.schedule_enabled', true);
+
+        $this->assertEqualsCanonicalizing(
+            ['/about?ref=nav', '/catalog', '/product/12'],
+            $site->addresses()->pluck('endpoint')->all(),
+        );
+    }
+
+    public function test_agent_import_strips_site_base_path_from_absolute_urls(): void
+    {
+        $user = User::factory()->create();
+        $site = Site::factory()->create([
+            'user_id' => $user->id,
+            'base_url' => 'https://shop.example.com/app',
+        ]);
+
+        $this->withToken($this->agentToken($user))
+            ->postJson('/api/v1/agent/sites/'.$site->id.'/addresses', [
+                'endpoints' => [
+                    'https://shop.example.com/app/users',
+                    'https://other.example.com/secret',
+                ],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('created', 1)
+            ->assertJsonPath('skipped', 1)
+            ->assertJsonPath('addresses.0.endpoint', '/users')
+            ->assertJsonPath('addresses.0.full_url', 'https://shop.example.com/app/users');
+    }
+
+    public function test_agent_import_all_duplicates_returns_ok_without_creating(): void
+    {
+        $user = User::factory()->create();
+        $site = Site::factory()->create([
+            'user_id' => $user->id,
+            'base_url' => 'https://shop.example.com',
+        ]);
+        Address::query()->create([
+            'site_id' => $site->id,
+            'endpoint' => '/health',
+        ]);
+
+        $this->withToken($this->agentToken($user))
+            ->postJson('/api/v1/agent/sites/'.$site->id.'/addresses', [
+                'endpoints' => ['/health'],
+            ])
+            ->assertOk()
+            ->assertJsonPath('created', 0)
+            ->assertJsonPath('skipped', 1)
+            ->assertJsonPath('addresses', []);
+
+        $this->assertSame(1, $site->addresses()->count());
+    }
+
+    public function test_agent_cannot_import_addresses_for_another_users_site(): void
+    {
+        $user = User::factory()->create();
+        $foreign = Site::factory()->create([
+            'user_id' => User::factory(),
+            'base_url' => 'https://other.example.com',
+        ]);
+
+        $this->withToken($this->agentToken($user))
+            ->postJson('/api/v1/agent/sites/'.$foreign->id.'/addresses', [
+                'endpoints' => ['/secret'],
+            ])
+            ->assertForbidden();
+
+        $this->assertSame(0, $foreign->addresses()->count());
+    }
+
+    public function test_agent_import_respects_plan_address_quota(): void
+    {
+        $plan = Plan::factory()->create([
+            'max_sites' => 3,
+            'max_addresses_per_site' => 2,
+        ]);
+        $user = User::factory()->create(['plan_id' => $plan->id]);
+        $site = Site::factory()->create(['user_id' => $user->id]);
+        $site->addresses()->create(['endpoint' => '/one']);
+        $site->addresses()->create(['endpoint' => '/two']);
+
+        $this->withToken($this->agentToken($user))
+            ->postJson('/api/v1/agent/sites/'.$site->id.'/addresses', [
+                'endpoints' => ['/three'],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['endpoints']);
+
+        $this->assertSame(2, $site->addresses()->count());
     }
 
     /**
