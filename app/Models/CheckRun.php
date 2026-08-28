@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'source',
     'started_at',
     'remaining_jobs',
+    'variables',
 ])]
 class CheckRun extends Model
 {
@@ -35,6 +36,7 @@ class CheckRun extends Model
             'created_at' => 'datetime',
             'remaining_jobs' => 'integer',
             'check_agent_id' => 'integer',
+            'variables' => 'array',
         ];
     }
 
@@ -69,6 +71,7 @@ class CheckRun extends Model
             'source' => $source,
             'started_at' => now(),
             'remaining_jobs' => max(0, $remainingJobs),
+            'variables' => [],
         ]);
     }
 }

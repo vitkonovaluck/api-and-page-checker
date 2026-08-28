@@ -41,7 +41,7 @@ class CreateAddressModal extends Component
 
     public function mount(Site $site): void
     {
-        $this->authorize('update', $site);
+        $this->authorize('view', $site);
         $this->site = $site;
     }
 

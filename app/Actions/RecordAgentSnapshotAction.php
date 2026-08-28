@@ -4,16 +4,22 @@ declare(strict_types=1);
 
 namespace App\Actions;
 
+use App\DTOs\DiffOptionsDTO;
 use App\DTOs\RecordAgentSnapshotDTO;
+use App\Enums\CheckOutcome;
+use App\Events\SnapshotRecorded;
 use App\Models\Address;
 use App\Models\CheckAgent;
 use App\Models\CheckRun;
 use App\Models\Snapshot;
+use App\Services\DiffService;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final class RecordAgentSnapshotAction
 {
+    public function __construct(private DiffService $diffService) {}
+
     public function execute(CheckAgent $agent, CheckRun $run, RecordAgentSnapshotDTO $dto): Snapshot
     {
         $run->loadMissing('site');
@@ -22,6 +28,9 @@ final class RecordAgentSnapshotAction
         $this->assertNotDuplicate($run, $address);
 
         return DB::transaction(function () use ($agent, $run, $address, $dto): Snapshot {
+            $previous = $address->snapshots()->orderByDesc('id')->first();
+            $address->loadMissing('baselineSnapshot');
+
             $snapshot = Snapshot::query()->create([
                 'address_id' => $address->id,
                 'check_run_id' => $run->id,
@@ -35,8 +44,24 @@ final class RecordAgentSnapshotAction
                 'error_message' => $dto->errorMessage,
             ]);
 
+            $options = DiffOptionsDTO::fromAddress($address);
+            $historyDiff = $this->diffService->compare($previous, $snapshot, $options);
+            $compareTo = $address->baselineSnapshot ?? $previous;
+            $alertDiff = $compareTo !== null && $previous !== null && $compareTo->id !== $previous->id
+                ? $this->diffService->compare($compareTo, $snapshot, $options)
+                : $historyDiff;
+
+            $outcome = match (true) {
+                $dto->errorMessage !== null => CheckOutcome::Failed,
+                ($alertDiff['has_changes'] ?? false) && ! ($alertDiff['is_first'] ?? false) => CheckOutcome::Changed,
+                default => CheckOutcome::Ok,
+            };
+
+            $snapshot->forceFill(['check_outcome' => $outcome])->save();
             $address->forceFill(['last_checked_at' => now()])->save();
             $this->decrementRemainingJobs($run);
+
+            SnapshotRecorded::dispatch($snapshot, $alertDiff, CheckRun::SOURCE_AGENT);
 
             return $snapshot;
         });

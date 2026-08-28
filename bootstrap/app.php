@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Middleware\EnsureCheckAgent;
+use App\Jobs\CheckSiteSslCertificatesJob;
+use App\Jobs\SendChangeDigestJob;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -19,6 +21,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('sites:run-scheduled')
             ->everyMinute()
+            ->withoutOverlapping();
+        $schedule->job(new SendChangeDigestJob)
+            ->dailyAt('08:00')
+            ->withoutOverlapping();
+        $schedule->job(new CheckSiteSslCertificatesJob)
+            ->dailyAt('06:00')
             ->withoutOverlapping();
     })
     ->withMiddleware(function (Middleware $middleware): void {

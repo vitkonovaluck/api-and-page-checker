@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Actions\EnsurePersonalOrganizationAction;
 use App\Enums\ColorScheme;
 use App\Enums\UserRole;
 use App\Models\Plan;
@@ -55,5 +56,12 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes): array => [
             'password' => null,
         ]);
+    }
+
+    public function configure(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            app(EnsurePersonalOrganizationAction::class)->execute($user);
+        });
     }
 }

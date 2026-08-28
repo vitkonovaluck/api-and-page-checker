@@ -96,7 +96,7 @@ class Show extends Component
         StopManualCheckRunAction $stopManualCheckRun,
     ): View {
         $this->syncBusyState($guard);
-        $this->site->load(['addresses' => fn ($q) => $q->with(['latestSnapshot', 'previousSnapshot'])->orderBy('id')]);
+        $this->site->load(['addresses' => fn ($q) => $q->with(['latestSnapshot', 'previousSnapshot', 'openIncident'])->orderBy('id')]);
 
         $metric = $this->responseTimeMetric();
         $addressStats = $checkStats->forAddresses($this->site->addresses, $metric);

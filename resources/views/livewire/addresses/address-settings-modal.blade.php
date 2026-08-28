@@ -42,6 +42,56 @@
             <div class="rounded-lg border border-white/10 bg-white/5 p-4">
                 @include('livewire.partials.headers-editor')
             </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-zinc-200">Kind</label>
+                <select wire:model="kind" class="w-full rounded-lg border border-white/15 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 sm:max-w-xs">
+                    <option value="http">HTTP</option>
+                    <option value="openapi">OpenAPI</option>
+                </select>
+            </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-zinc-200">Ignore JSON paths</label>
+                <textarea wire:model="ignoreJsonPaths" rows="3" class="w-full rounded-lg border border-white/15 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-100" placeholder="$.updated_at"></textarea>
+            </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-zinc-200">Ignore headers</label>
+                <textarea wire:model="ignoreHeaders" rows="2" class="w-full rounded-lg border border-white/15 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-100" placeholder="date"></textarea>
+            </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-zinc-200">Ignore body regex</label>
+                <textarea wire:model="ignoreBodyRegex" rows="2" class="w-full rounded-lg border border-white/15 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-100"></textarea>
+            </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-zinc-200">Watch JSON paths</label>
+                <textarea wire:model="watchJsonPaths" rows="2" class="w-full rounded-lg border border-white/15 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-100" placeholder="$.items[*].price"></textarea>
+            </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-zinc-200">Assertions JSON</label>
+                <textarea wire:model="assertionsJson" rows="4" class="w-full rounded-lg border border-white/15 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-100" placeholder='[{"type":"status_in","values":[200]}]'></textarea>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-3">
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-zinc-200">Step order</label>
+                    <input type="number" min="1" wire:model="stepOrder" class="w-full rounded-lg border border-white/15 bg-zinc-950 px-3 py-2 text-sm text-zinc-100">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-zinc-200">Extract JSON path</label>
+                    <input type="text" wire:model="extractJsonPath" class="w-full rounded-lg border border-white/15 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-100">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-zinc-200">Extract as</label>
+                    <input type="text" wire:model="extractAs" class="w-full rounded-lg border border-white/15 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-100">
+                </div>
+            </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-zinc-200">Preferred agent / region</label>
+                <select wire:model="checkAgentId" class="w-full rounded-lg border border-white/15 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 sm:max-w-xs">
+                    <option value="">Server</option>
+                    @foreach ($agents as $agent)
+                        <option value="{{ $agent->id }}">{{ $agent->name }}{{ $agent->region ? ' ('.$agent->region.')' : '' }}</option>
+                    @endforeach
+                </select>
+            </div>
         </div>
 
         <div class="flex justify-end gap-2 border-t border-white/10 px-5 py-4">

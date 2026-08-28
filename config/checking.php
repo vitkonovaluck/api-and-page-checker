@@ -122,4 +122,6 @@ return [
     */
     'snapshot_delete_chunk' => (int) env('CHECKING_SNAPSHOT_DELETE_CHUNK', 50),
     'delete_run_lock_seconds' => (int) env('CHECKING_DELETE_RUN_LOCK_SECONDS', 7200),
+    'alert_cooldown_minutes' => (int) env('CHECKING_ALERT_COOLDOWN_MINUTES', 30),
+    'ssl_warn_days' => (int) env('CHECKING_SSL_WARN_DAYS', 14),
 ];

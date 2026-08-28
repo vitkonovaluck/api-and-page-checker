@@ -59,4 +59,8 @@ return [
         'redirect' => env('LINKEDIN_REDIRECT_URI', rtrim((string) env('APP_URL', 'http://localhost'), '/').'/auth/linkedin/callback'),
     ],
 
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+    ],
+
 ];

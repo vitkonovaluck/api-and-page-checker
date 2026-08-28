@@ -42,7 +42,7 @@ class Index extends Component
 
     public function stopManualCheckRun(int $siteId, StopManualCheckRunAction $action): void
     {
-        $site = $this->currentUser()->sites()->whereKey($siteId)->firstOrFail();
+        $site = $this->currentUser()->accessibleSites()->whereKey($siteId)->firstOrFail();
         $this->authorize('update', $site);
 
         if (! $action->queue($site)) {
@@ -68,7 +68,7 @@ class Index extends Component
         CheckStats $checkStats,
     ): View {
         $user = $this->currentUser();
-        $sites = $user->sites()
+        $sites = $user->accessibleSites()
             ->withCount('addresses')
             ->with(['addresses' => fn ($q) => $q->orderByDesc('last_checked_at')])
             ->orderByDesc('updated_at')

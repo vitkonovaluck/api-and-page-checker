@@ -25,6 +25,7 @@ class CheckAgentFactory extends Factory
             'last_seen_at' => null,
             'last_ip' => null,
             'personal_access_token_id' => null,
+            'region' => null,
         ];
     }
 }

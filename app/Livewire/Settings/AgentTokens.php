@@ -19,6 +19,8 @@ final class AgentTokens extends Component
 
     public string $hostname = '';
 
+    public string $region = '';
+
     public ?string $plainTextToken = null;
 
     public function create(IssueAgentTokenAction $issueToken): void
@@ -26,6 +28,7 @@ final class AgentTokens extends Component
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'hostname' => ['nullable', 'string', 'max:255'],
+            'region' => ['nullable', 'string', 'max:64'],
         ]);
 
         $issued = $issueToken->execute(
@@ -34,11 +37,12 @@ final class AgentTokens extends Component
                 name: $validated['name'],
                 hostname: $validated['hostname'] !== '' ? $validated['hostname'] : null,
                 ip: request()->ip(),
+                region: $validated['region'] !== '' ? $validated['region'] : null,
             ),
         );
 
         $this->plainTextToken = $issued['plainTextToken'];
-        $this->reset(['name', 'hostname']);
+        $this->reset(['name', 'hostname', 'region']);
         $this->resetValidation();
     }
 

@@ -10,15 +10,21 @@ use App\Models\User;
 
 final class RegisterUserAction
 {
+    public function __construct(private EnsurePersonalOrganizationAction $organizations) {}
+
     public function execute(string $name, string $email, ?string $password = null): User
     {
-        return User::query()->create([
+        $user = User::query()->create([
             'name' => $name,
             'email' => $email,
             'password' => $password,
             'role' => UserRole::User,
             'plan_id' => $this->defaultPlan()->id,
         ]);
+
+        $this->organizations->execute($user);
+
+        return $user;
     }
 
     private function defaultPlan(): Plan

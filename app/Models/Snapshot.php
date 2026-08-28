@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\CheckOutcome;
 use App\Enums\ResponseTimeMetric;
+use Database\Factories\SnapshotFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -20,9 +23,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'response_time_ms',
     'timing',
     'error_message',
+    'assertion_failed',
+    'assertion_results',
+    'check_outcome',
 ])]
 class Snapshot extends Model
 {
+    /** @use HasFactory<SnapshotFactory> */
+    use HasFactory;
+
     public const UPDATED_AT = null;
 
     protected function casts(): array
@@ -34,6 +43,9 @@ class Snapshot extends Model
             'response_time_ms' => 'integer',
             'check_run_id' => 'integer',
             'check_agent_id' => 'integer',
+            'assertion_failed' => 'boolean',
+            'assertion_results' => 'array',
+            'check_outcome' => CheckOutcome::class,
             'created_at' => 'datetime',
         ];
     }

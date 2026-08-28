@@ -55,8 +55,18 @@ class CheckAddressJob implements ShouldQueue
         $addressList = Collection::make($addresses);
         $run = CheckRun::start($site, $source, $addressList->count());
 
-        foreach ($addressList as $address) {
+        $independent = $addressList->filter(fn (Address $address): bool => $address->step_order === null);
+        $stepped = $addressList
+            ->filter(fn (Address $address): bool => $address->step_order !== null)
+            ->sortBy('step_order')
+            ->values();
+
+        foreach ($independent as $address) {
             self::dispatch($address, $run->id);
+        }
+
+        if ($stepped->isNotEmpty()) {
+            self::dispatch($stepped->first(), $run->id);
         }
 
         return $run;
@@ -74,7 +84,8 @@ class CheckAddressJob implements ShouldQueue
     {
         try {
             $this->address->loadMissing('site');
-            $checker->check($this->address, $this->checkRunId);
+            $result = $checker->check($this->address, $this->checkRunId);
+            $this->queueNextStep($result['snapshot']->error_message === null);
         } catch (CheckRunCancelledException) {
             return;
         }
@@ -90,6 +101,24 @@ class CheckAddressJob implements ShouldQueue
     public function failed(?Throwable $exception): void
     {
         $this->maybeQueueChainedCheck();
+    }
+
+    private function queueNextStep(bool $previousSucceeded): void
+    {
+        if (! $previousSucceeded || $this->checkRunId === null || $this->address->step_order === null) {
+            return;
+        }
+
+        $next = Address::query()
+            ->where('site_id', $this->siteId)
+            ->whereNotNull('step_order')
+            ->where('step_order', '>', $this->address->step_order)
+            ->orderBy('step_order')
+            ->first();
+
+        if ($next !== null) {
+            self::dispatch($next, $this->checkRunId);
+        }
     }
 
     private function maybeQueueChainedCheck(): void

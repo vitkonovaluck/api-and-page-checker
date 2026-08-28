@@ -12,7 +12,7 @@
         </div>
     @endif
 
-    <form wire:submit="create" class="mb-6 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+    <form wire:submit="create" class="mb-6 grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
         <div>
             <label for="agent-name" class="mb-1 block text-sm font-medium text-zinc-200">Назва агента</label>
             <input
@@ -35,6 +35,17 @@
                 class="w-full rounded-lg border border-white/15 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 shadow-sm focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/30"
             >
             @error('hostname') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
+        </div>
+        <div>
+            <label for="agent-region" class="mb-1 block text-sm font-medium text-zinc-200">Регіон</label>
+            <input
+                id="agent-region"
+                type="text"
+                wire:model="region"
+                placeholder="eu-west"
+                class="w-full rounded-lg border border-white/15 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 shadow-sm focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/30"
+            >
+            @error('region') <p class="mt-1 text-xs text-rose-400">{{ $message }}</p> @enderror
         </div>
         <div class="flex items-end">
             <button
@@ -60,6 +71,10 @@
                         <p class="text-xs text-zinc-500">
                             @if ($agent->hostname)
                                 {{ $agent->hostname }}
+                                ·
+                            @endif
+                            @if ($agent->region)
+                                {{ $agent->region }}
                                 ·
                             @endif
                             @if ($agent->hasActiveToken())

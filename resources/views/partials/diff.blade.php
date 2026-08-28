@@ -32,6 +32,9 @@
     @else
         <p class="mb-4 rounded-lg border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-sm text-amber-100">
             Виявлено зміни відносно попереднього знімка.
+            @if (($diff['classification'] ?? 'none') !== 'none')
+                <span class="ml-2 rounded bg-white/10 px-1.5 py-0.5 text-xs">{{ $diff['classification'] }}</span>
+            @endif
         </p>
     @endif
 
@@ -163,6 +166,7 @@
                             <tr>
                                 <th class="px-3 py-2">Шлях</th>
                                 <th class="px-3 py-2">Тип</th>
+                                <th class="px-3 py-2">Категорія</th>
                                 <th class="px-3 py-2">Було</th>
                                 <th class="px-3 py-2">Стало</th>
                             </tr>
@@ -172,6 +176,15 @@
                                 <tr>
                                     <td class="px-3 py-2 font-mono text-xs">{{ $change['path'] }}</td>
                                     <td class="px-3 py-2">{{ $typeLabels[$change['type']] ?? $change['type'] }}</td>
+                                    <td class="px-3 py-2">
+                                        @if (($change['category'] ?? '') === 'schema')
+                                            <span class="rounded bg-rose-400/15 px-1.5 py-0.5 text-[11px] text-rose-200">schema</span>
+                                        @elseif (($change['category'] ?? '') === 'value')
+                                            <span class="rounded bg-amber-300/15 px-1.5 py-0.5 text-[11px] text-amber-200">value</span>
+                                        @else
+                                            —
+                                        @endif
+                                    </td>
                                     <td class="max-w-xs whitespace-pre-wrap break-all px-3 py-2 font-mono text-xs text-rose-300">{{ $formatDiffValue($change['old']) }}</td>
                                     <td class="max-w-xs whitespace-pre-wrap break-all px-3 py-2 font-mono text-xs text-emerald-300">{{ $formatDiffValue($change['new']) }}</td>
                                 </tr>

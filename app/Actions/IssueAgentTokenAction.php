@@ -22,6 +22,7 @@ final class IssueAgentTokenAction
 
         $agent->forceFill([
             'hostname' => $dto->hostname ?? $agent->hostname,
+            'region' => $dto->region ?? $agent->region,
             'personal_access_token_id' => $token->accessToken->id,
             'last_seen_at' => now(),
             'last_ip' => $dto->ip,
@@ -42,6 +43,7 @@ final class IssueAgentTokenAction
             ],
             [
                 'hostname' => $dto->hostname,
+                'region' => $dto->region,
             ],
         );
     }

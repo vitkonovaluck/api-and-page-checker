@@ -18,6 +18,9 @@
                 <p class="mt-2 text-sm text-zinc-400">
                     Остання перевірка:
                     {{ $address->last_checked_at?->format('d.m.Y H:i:s') ?? 'ще не перевірялася' }}
+                    @if ($hasOpenIncident)
+                        <span class="ml-2 rounded bg-amber-300/15 px-1.5 py-0.5 text-xs font-medium text-amber-200">{{ __('alerts.open_change') }}</span>
+                    @endif
                 </p>
             </div>
             <div class="flex flex-wrap gap-2">
@@ -43,6 +46,15 @@
                     :busy="in_array($site->id, $busySiteIds, true)"
                     label="Зробити знімок"
                 />
+                @if ($diff && $diff['has_changes'] && ! $diff['is_first'])
+                    <button
+                        type="button"
+                        wire:click="acceptBaseline"
+                        class="inline-flex items-center gap-2 rounded-lg border border-amber-300/30 bg-amber-300/10 px-4 py-2 text-sm font-medium text-amber-100 transition hover:bg-amber-300/20"
+                    >
+                        {{ __('alerts.ui.accept_baseline') }}
+                    </button>
+                @endif
             </div>
         </div>
     </div>
@@ -56,7 +68,38 @@
         :key="'chart-address-'.$address->id"
     />
 
+    @if ($latest && is_array($latest->assertion_results) && $latest->assertion_results !== [])
+        <section class="mb-8 rounded-2xl border border-white/10 bg-zinc-900/80 p-5 shadow-xl shadow-cyan-950/20 backdrop-blur-sm">
+            <h2 class="mb-3 text-lg font-semibold text-white">{{ __('alerts.ui.assertions') }}</h2>
+            <ul class="space-y-2 text-sm">
+                @foreach ($latest->assertion_results as $result)
+                    <li class="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                        <span class="{{ ($result['passed'] ?? false) ? 'text-emerald-300' : 'text-rose-300' }}">
+                            {{ ($result['passed'] ?? false) ? 'pass' : 'fail' }}
+                        </span>
+                        <span class="font-mono text-xs text-zinc-300">{{ $result['type'] ?? '' }}</span>
+                        <span class="text-xs text-zinc-500">expected {{ is_scalar($result['expected'] ?? null) || $result['expected'] === null ? json_encode($result['expected'] ?? null) : '…' }}</span>
+                        <span class="text-xs text-zinc-500">actual {{ is_scalar($result['actual'] ?? null) || $result['actual'] === null ? json_encode($result['actual'] ?? null) : '…' }}</span>
+                    </li>
+                @endforeach
+            </ul>
+        </section>
+    @endif
+
     @if ($diff && $latest)
+        @if ($compareSnapshots->count() > 1)
+            <div class="mb-4">
+                <label class="mb-1 block text-sm font-medium text-zinc-200">{{ __('alerts.ui.compare_with') }}</label>
+                <select wire:model.live="compareFromId" class="rounded-lg border border-white/15 bg-zinc-950 px-3 py-2 text-sm text-zinc-100">
+                    <option value="">{{ __('alerts.ui.previous_snapshot') }}</option>
+                    @foreach ($compareSnapshots as $option)
+                        @if ($latest && $option->id !== $latest->id)
+                            <option value="{{ $option->id }}">#{{ $option->id }} · {{ $option->created_at?->format('d.m.Y H:i:s') }}</option>
+                        @endif
+                    @endforeach
+                </select>
+            </div>
+        @endif
         <div class="mb-8">
             @include('partials.diff', ['diff' => $diff])
         </div>

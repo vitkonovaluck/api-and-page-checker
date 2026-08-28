@@ -1230,12 +1230,12 @@ class ApiSnapshotCheckerTest extends TestCase
 
         Livewire::test(Show::class, ['site' => $site])
             ->assertOk()
-            ->assertSeeHtml('bg-red-100 text-red-800')
+            ->assertSeeHtml('bg-rose-400/10 text-rose-200')
             ->assertSeeHtml('500')
             ->assertSeeHtml('(200)')
-            ->assertSeeHtml('text-red-600')
+            ->assertSeeHtml('text-rose-400')
             ->assertSeeHtml('↑')
-            ->assertSeeHtml('text-emerald-600')
+            ->assertSeeHtml('text-emerald-400')
             ->assertSeeHtml('↓');
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
+use App\Actions\EnsurePersonalOrganizationAction;
 use App\Livewire\Concerns\NormalizesEndpoint;
 use App\Models\Site;
 use App\Models\User;
@@ -46,7 +47,7 @@ class CreateSiteModal extends Component
         $this->resetValidation();
     }
 
-    public function save(PlanQuota $quota): void
+    public function save(PlanQuota $quota, EnsurePersonalOrganizationAction $ensureOrganization): void
     {
         $this->authorize('create', Site::class);
 
@@ -54,10 +55,12 @@ class CreateSiteModal extends Component
         $user = $this->currentUser();
 
         $quota->assertCanCreateSite($user);
+        $organization = $ensureOrganization->execute($user);
 
         $site = $user->sites()->create([
             'name' => $validated['name'],
             'base_url' => rtrim($validated['base_url'], '/'),
+            'organization_id' => $organization->id,
         ]);
 
         if (! empty($validated['endpoint'])) {

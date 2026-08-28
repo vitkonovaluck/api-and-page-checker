@@ -10,5 +10,6 @@ final readonly class IssueAgentTokenDTO
         public string $name,
         public ?string $hostname = null,
         public ?string $ip = null,
+        public ?string $region = null,
     ) {}
 }

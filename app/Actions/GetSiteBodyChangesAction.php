@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions;
 
 use App\DTOs\AddressBodyChangeDTO;
+use App\DTOs\DiffOptionsDTO;
 use App\Models\Address;
 use App\Models\Site;
 use App\Services\DiffService;
@@ -46,7 +47,7 @@ final class GetSiteBodyChangesAction
             return null;
         }
 
-        $body = $this->diffService->compare($previous, $latest)['body'];
+        $body = $this->diffService->compare($previous, $latest, DiffOptionsDTO::fromAddress($address))['body'];
 
         if (! $body['changed']) {
             return null;

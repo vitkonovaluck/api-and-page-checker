@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'last_seen_at',
     'last_ip',
     'personal_access_token_id',
+    'region',
 ])]
 class CheckAgent extends Model
 {

@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Actions\EnsurePersonalOrganizationAction;
+use App\Enums\AddressKind;
 use App\Models\Address;
+use App\Models\AlertRule;
+use App\Models\NotificationChannel;
 use App\Models\Site;
 use App\Models\SiteToken;
 use App\Models\User;
@@ -20,7 +24,10 @@ final class SiteTransferService
 {
     public const FORMAT = 'api-checker-sites';
 
-    public function __construct(private PlanQuota $quota) {}
+    public function __construct(
+        private PlanQuota $quota,
+        private EnsurePersonalOrganizationAction $ensureOrganization,
+    ) {}
 
     /**
      * @return array{format: string, version: int, exported_at: string, sites: list<array<string, mixed>>}
@@ -147,6 +154,7 @@ final class SiteTransferService
                 ->values()
                 ->all(),
             'addresses' => $site->addresses->map($this->addressToArray(...))->values()->all(),
+            'alert_rules' => $site->alertRules->map($this->alertRuleToArray(...))->values()->all(),
         ];
     }
 
@@ -163,6 +171,30 @@ final class SiteTransferService
             'request_headers' => $address->request_headers ?? [],
             'request_body' => $address->request_body,
             'token' => $address->siteToken?->name,
+            'ignore_json_paths' => $address->ignore_json_paths ?? [],
+            'ignore_headers' => $address->ignore_headers ?? [],
+            'ignore_body_regex' => $address->ignore_body_regex ?? [],
+            'watch_json_paths' => $address->watch_json_paths ?? [],
+            'assertions' => $address->assertions ?? [],
+            'kind' => $address->kind instanceof AddressKind ? $address->kind->value : 'http',
+            'step_order' => $address->step_order,
+            'extract_json_path' => $address->extract_json_path,
+            'extract_as' => $address->extract_as,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function alertRuleToArray(AlertRule $alertRule): array
+    {
+        return [
+            'address_endpoint' => $alertRule->address?->endpoint,
+            'events' => $alertRule->events ?? [],
+            'min_consecutive' => $alertRule->min_consecutive,
+            'cooldown_minutes' => $alertRule->cooldown_minutes,
+            'notify_on_manual' => $alertRule->notify_on_manual,
+            'digest_value_changes' => $alertRule->digest_value_changes,
         ];
     }
 
@@ -418,6 +450,19 @@ final class SiteTransferService
             'request_headers' => ['nullable', 'array'],
             'request_body' => ['nullable', 'string'],
             'token' => ['nullable', 'string', 'max:255'],
+            'ignore_json_paths' => ['nullable', 'array'],
+            'ignore_json_paths.*' => ['string', 'max:255'],
+            'ignore_headers' => ['nullable', 'array'],
+            'ignore_headers.*' => ['string', 'max:255'],
+            'ignore_body_regex' => ['nullable', 'array'],
+            'ignore_body_regex.*' => ['string', 'max:255'],
+            'watch_json_paths' => ['nullable', 'array'],
+            'watch_json_paths.*' => ['string', 'max:255'],
+            'assertions' => ['nullable', 'array'],
+            'kind' => ['nullable', 'string', Rule::in(['http', 'openapi'])],
+            'step_order' => ['nullable', 'integer', 'min:1'],
+            'extract_json_path' => ['nullable', 'string', 'max:255'],
+            'extract_as' => ['nullable', 'string', 'max:64'],
         ];
     }
 
@@ -426,6 +471,8 @@ final class SiteTransferService
      */
     private function createSite(array $payload, User $user): Site
     {
+        $organization = $this->ensureOrganization->execute($user);
+
         $site = $user->sites()->create([
             'name' => $payload['name'],
             'base_url' => rtrim((string) $payload['base_url'], '/'),
@@ -433,12 +480,57 @@ final class SiteTransferService
             'schedule_interval' => $payload['schedule_interval'] ?? null,
             'schedule_last_run_at' => null,
             'requests_per_minute' => $payload['requests_per_minute'] ?? null,
+            'organization_id' => $organization->id,
         ]);
 
         $tokenIdsByName = $this->createTokens($site, $payload['tokens'] ?? []);
         $this->createAddresses($site, $payload['addresses'] ?? [], $tokenIdsByName);
+        $this->createAlertRules($site, $user, $payload['alert_rules'] ?? []);
 
         return $site;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rules
+     */
+    private function createAlertRules(Site $site, User $user, array $rules): void
+    {
+        if ($rules === []) {
+            return;
+        }
+
+        $channel = NotificationChannel::query()
+            ->where('user_id', $user->id)
+            ->where('is_enabled', true)
+            ->orderBy('id')
+            ->first();
+
+        if ($channel === null) {
+            return;
+        }
+
+        foreach ($rules as $rule) {
+            if (! is_array($rule)) {
+                continue;
+            }
+
+            $endpoint = $rule['address_endpoint'] ?? null;
+            $addressId = null;
+
+            if (is_string($endpoint) && $endpoint !== '') {
+                $addressId = $site->addresses()->where('endpoint', $endpoint)->value('id');
+            }
+
+            $site->alertRules()->create([
+                'address_id' => $addressId,
+                'notification_channel_id' => $channel->id,
+                'events' => $rule['events'] ?? ['body_changed'],
+                'min_consecutive' => $rule['min_consecutive'] ?? 1,
+                'cooldown_minutes' => $rule['cooldown_minutes'] ?? 0,
+                'notify_on_manual' => (bool) ($rule['notify_on_manual'] ?? false),
+                'digest_value_changes' => (bool) ($rule['digest_value_changes'] ?? false),
+            ]);
+        }
     }
 
     /**
@@ -475,6 +567,15 @@ final class SiteTransferService
                 'schedule_enabled' => (bool) ($address['schedule_enabled'] ?? true),
                 'request_headers' => $address['request_headers'] ?? [],
                 'request_body' => $address['request_body'] ?? null,
+                'ignore_json_paths' => $address['ignore_json_paths'] ?? [],
+                'ignore_headers' => $address['ignore_headers'] ?? [],
+                'ignore_body_regex' => $address['ignore_body_regex'] ?? [],
+                'watch_json_paths' => $address['watch_json_paths'] ?? [],
+                'assertions' => $address['assertions'] ?? [],
+                'kind' => $address['kind'] ?? AddressKind::Http->value,
+                'step_order' => $address['step_order'] ?? null,
+                'extract_json_path' => $address['extract_json_path'] ?? null,
+                'extract_as' => $address['extract_as'] ?? null,
                 'last_checked_at' => null,
                 'site_token_id' => is_string($tokenName) && $tokenName !== ''
                     ? ($tokenIdsByName[$tokenName] ?? null)
@@ -528,6 +629,7 @@ final class SiteTransferService
         return [
             'tokens' => fn ($query) => $query->orderBy('id'),
             'addresses' => fn ($query) => $query->orderBy('id')->with('siteToken'),
+            'alertRules.address',
         ];
     }
 

@@ -22,6 +22,9 @@ use Illuminate\Support\Carbon;
     'schedule_interval',
     'schedule_last_run_at',
     'requests_per_minute',
+    'organization_id',
+    'ssl_expires_at',
+    'ssl_checked_at',
 ])]
 class Site extends Model
 {
@@ -61,6 +64,8 @@ class Site extends Model
         return [
             'schedule_enabled' => 'boolean',
             'schedule_last_run_at' => 'datetime',
+            'ssl_expires_at' => 'datetime',
+            'ssl_checked_at' => 'datetime',
         ];
     }
 
@@ -93,6 +98,16 @@ class Site extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    public function alertRules(): HasMany
+    {
+        return $this->hasMany(AlertRule::class);
     }
 
     public function addresses(): HasMany

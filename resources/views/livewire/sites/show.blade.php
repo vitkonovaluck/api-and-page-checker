@@ -23,6 +23,9 @@
                         @if ($site->checksPerMinute() > 0)
                             <span class="text-zinc-400">· {{ $site->checksPerMinute() }} перевірок/хв</span>
                         @endif
+                        @if ($site->ssl_expires_at)
+                            <span class="text-amber-200">· SSL {{ $site->ssl_expires_at->format('d.m.Y') }}</span>
+                        @endif
                     </p>
                 </div>
             </div>
@@ -254,6 +257,9 @@
                                             <span class="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-300">{{ $address->http_method ?: 'GET' }}</span>
                                             <span class="truncate">{{ $address->endpoint }}</span>
                                         </a>
+                                        @if ($address->openIncident)
+                                            <span class="shrink-0 rounded bg-amber-300/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-200">{{ __('alerts.open_change') }}</span>
+                                        @endif
                                         @if ($headerCount > 0)
                                             <span class="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[11px] text-zinc-400">{{ $headerCount }} {{ $headerCount === 1 ? 'header' : 'headers' }}</span>
                                         @endif
@@ -365,6 +371,7 @@
 </div>
 
     <livewire:sites.site-settings-modal :site="$site" :key="'site-settings-'.$site->id" />
+    <livewire:sites.alert-rules :site="$site" :key="'alert-rules-'.$site->id" />
     <livewire:addresses.create-address-modal :site="$site" :key="'create-address-'.$site->id" />
     <livewire:sites.address-list-modal :site="$site" :key="'address-list-'.$site->id" />
     <livewire:sites.error-snapshots-modal :site="$site" :key="'error-snapshots-'.$site->id" />

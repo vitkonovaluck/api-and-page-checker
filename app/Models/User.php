@@ -11,8 +11,10 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -70,6 +72,41 @@ class User extends Authenticatable implements FilamentUser
     public function sites(): HasMany
     {
         return $this->hasMany(Site::class);
+    }
+
+    /**
+     * @return Builder<Site>
+     */
+    public function accessibleSites(): Builder
+    {
+        $organizationIds = $this->organizations()->pluck('organizations.id');
+
+        return Site::query()->where(function (Builder $query) use ($organizationIds): void {
+            $query->where('user_id', $this->id)
+                ->orWhereIn('organization_id', $organizationIds);
+        });
+    }
+
+    public function organizations(): BelongsToMany
+    {
+        return $this->belongsToMany(Organization::class, 'organization_users')
+            ->withPivot('role')
+            ->withTimestamps();
+    }
+
+    public function ownedOrganizations(): HasMany
+    {
+        return $this->hasMany(Organization::class, 'owner_user_id');
+    }
+
+    public function notificationChannels(): HasMany
+    {
+        return $this->hasMany(NotificationChannel::class);
+    }
+
+    public function personalOrganization(): ?Organization
+    {
+        return $this->ownedOrganizations()->where('is_personal', true)->first();
     }
 
     public function addresses(): HasManyThrough

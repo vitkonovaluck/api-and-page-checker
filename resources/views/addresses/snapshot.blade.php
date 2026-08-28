@@ -18,6 +18,17 @@
         <p class="mt-1 break-all font-mono text-xs text-zinc-500">{{ $address->fullUrl() }}</p>
         <div class="mt-3 flex flex-wrap items-center gap-3">
             <p class="text-sm text-zinc-400">{{ $snapshot->created_at->format('d.m.Y H:i:s') }}</p>
+            @if ($compareSnapshots->isNotEmpty())
+                <form method="GET" action="{{ route('addresses.snapshots.show', [$site, $address, $snapshot]) }}" class="flex items-center gap-2">
+                    <label class="text-xs text-zinc-400">{{ __('alerts.ui.compare_with') }}</label>
+                    <select name="compare" onchange="this.form.submit()" class="rounded-lg border border-white/15 bg-zinc-950 px-2 py-1 text-xs text-zinc-100">
+                        <option value="">{{ __('alerts.ui.previous_snapshot') }}</option>
+                        @foreach ($compareSnapshots as $option)
+                            <option value="{{ $option->id }}" @selected((int) request('compare') === $option->id)>#{{ $option->id }} · {{ $option->created_at?->format('d.m.Y H:i:s') }}</option>
+                        @endforeach
+                    </select>
+                </form>
+            @endif
             <form method="POST" action="{{ route('addresses.snapshots.destroy', [$site, $address, $snapshot]) }}" onsubmit="return confirm('Видалити цей знімок?')">
                 @csrf
                 @method('DELETE')

@@ -39,7 +39,7 @@ class SiteSettingsModal extends Component
 
     public function mount(Site $site): void
     {
-        $this->authorize('update', $site);
+        $this->authorize('view', $site);
         $this->site = $site;
         $this->fillFromSite();
     }
@@ -47,6 +47,7 @@ class SiteSettingsModal extends Component
     #[On('open-site-settings')]
     public function open(): void
     {
+        $this->authorize('update', $this->site);
         $this->site->refresh();
         $this->site->load([
             'addresses' => fn ($q) => $q->orderBy('id'),
@@ -65,6 +66,7 @@ class SiteSettingsModal extends Component
 
     public function save(): void
     {
+        $this->authorize('update', $this->site);
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'base_url' => ['required', 'url', 'max:2048'],
@@ -159,6 +161,7 @@ class SiteSettingsModal extends Component
 
     public function clearSnapshots(): void
     {
+        $this->authorize('update', $this->site);
         $deleted = $this->site->snapshots()->delete();
 
         $this->show = false;

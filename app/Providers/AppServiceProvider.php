@@ -55,6 +55,12 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($request->ip() ?? 'agent-login');
         });
 
+        RateLimiter::for('public-api', function (Request $request) {
+            $userId = $request->user()?->getAuthIdentifier();
+
+            return Limit::perMinute(60)->by('public-api:'.($userId ?? $request->ip() ?? 'guest'));
+        });
+
         RateLimiter::for('agent-api', function (Request $request) {
             $userId = $request->user()?->getAuthIdentifier();
 
